@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Node IoT Configuration</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #0f97ff;
+            color: white;
+            padding: 10px 20px;
+        }
+        .header h1 {
+            margin: 0;
+        }
+        .tabs {
+            display: flex;
+            margin-top: 20px;
+            border-bottom: 2px solid #ddd;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            background-color: #f9f9f9;
+        }
+        .tab.active {
+            background-color: white;
+            font-weight: bold;
+            border-top: 2px solid #0f97ff;
+        }
+        .tab-content {
+            display: none;
+            margin-top: 20px;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+        button {
+            padding: 5px 10px;
+            background-color: #f44336;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #d32f2f;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Node IoT Configuration</h1>
+    </div>
+
+    <div class="tabs">
+        <div class="tab active" onclick="showTab('modbusConfig')">Modbus Configuration</div>
+        <div class="tab" onclick="showTab('fileManager')">File Manager</div>
+    </div>
+<CENTER>
+    <div id="modbusConfig" class="tab-content active">
+        <h2>Modbus Configuration</h2>
+        <form id="modbusConfigForm">
+            <div style="margin-bottom: 10px;">
+            <label for="role" style="display: inline-block; width: 150px;">Role:</label>
+            <select id="role" name="role" style="width: 200px;">
+                <option value="master">Master</option>
+                <option value="slave">Slave</option>
+            </select>
+            </div>
+
+            <div style="margin-bottom: 10px;">
+            <label for="com" style="display: inline-block; width: 150px;">Communication (Com):</label>
+            <select id="com" name="com" style="width: 200px;">
+                <option value="TCP/IP">TCP/IP</option>
+                <option value="RS485">RS485</option>
+            </select>
+            </div>
+            <div style="margin-bottom: 10px;">
+                <table id="tagsTable">
+                    <thead>
+                        <tr>
+                            <th>Tag</th>
+                            <th>Value</th>
+                            <th>Type</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><input type="text" name="tags[]" placeholder="1101" required></td>
+                            <td><input type="text" name="values[]" placeholder="164" required></td>
+                            <td><input type="text" name="types[]" placeholder="2" required></td>
+                            <td><button type="button" onclick="deleteRow(this)">Delete</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+                <button type="button" onclick="addRow()">Add Row</button>
+            </div>
+
+            <script>
+                function addRow() {
+                    const table = document.getElementById('tagsTable').getElementsByTagName('tbody')[0];
+                    const rowCount = table.rows.length;
+
+                    if (rowCount >= 120) {
+                        alert('Maximum of 120 rows allowed.');
+                        return;
+                    }
+
+                    const newRow = table.insertRow();
+                    newRow.innerHTML = `
+                        <td><input type="number" name="tags[]" placeholder="1101" required></td>
+                        <td><input type="number" name="values[]" placeholder="164" required></td>
+                        <td><input type="number" name="types[]" placeholder="2" required></td>
+                        <td><button type="button" onclick="deleteRow(this)">Delete</button></td>
+                    `;
+                }
+
+                function deleteRow(button) {
+                    const row = button.parentElement.parentElement;
+                    row.parentElement.removeChild(row);
+                }
+            </script>
+            <div style="margin-bottom: 10px;">
+            <label for="id" style="display: inline-block; width: 150px;">Modbus Slave ID:</label>
+            <input type="number" id="id" name="id" min="1" max="255" required style="width: 200px;">
+            </div>
+
+            <div style="margin-bottom: 10px;">
+            <label for="slaveip" style="display: inline-block; width: 150px;">Slave IP:</label>
+            <input type="text" id="slaveip" name="slaveip" placeholder="192,168,1,100" required style="width: 200px;">
+            </div>
+
+            <!-- <div style="margin-bottom: 10px;">
+            <label for="tags" style="display: inline-block; width: 150px;">Tags:</label>
+            <input type="text" id="tags" name="tags" placeholder="1101,1102,1103" required style="width: 200px;">
+            </div>
+
+            <div style="margin-bottom: 10px;">
+            <label for="values" style="display: inline-block; width: 150px;">Values:</label>
+            <input type="text" id="values" name="values" placeholder="164,166,32" required style="width: 200px;">
+            </div>
+
+            <div style="margin-bottom: 10px;">
+            <label for="types" style="display: inline-block; width: 150px;">Types:</label>
+            <input type="text" id="types" name="types" placeholder="2,2,0" required style="width: 200px;">
+            </div> -->
+
+            <button type="button" onclick="submitConfig()">Submit</button>
+        </form>
+
+        <script>
+            // Function to update form values from ESP data
+            function updateFormFromESP(data) {
+                // Cập nhật các trường đơn lẻ
+                document.getElementById('role').value = data.role || 'master';
+                document.getElementById('com').value = data.Com || 'TCP/IP';
+                document.getElementById('id').value = data.id || '';
+                document.getElementById('slaveip').value = data.slaveip ? data.slaveip.join(',') : '';
+
+                // Cập nhật bảng tagsTable
+                const tableBody = document.getElementById('tagsTable').getElementsByTagName('tbody')[0];
+                tableBody.innerHTML = ''; // Xóa tất cả các hàng hiện tại
+
+                if (data.Tag && data.Value && data.Type) {
+                    for (let i = 0; i < data.Tag.length; i++) {
+                        const newRow = tableBody.insertRow();
+                        newRow.innerHTML = `
+                            <td><input type="number" name="tags[]" value="${data.Tag[i]}" required></td>
+                            <td><input type="number" name="values[]" value="${data.Value[i]}" required></td>
+                            <td><input type="number" name="types[]" value="${data.Type[i]}" required></td>
+                            <td><button type="button" onclick="deleteRow(this)">Delete</button></td>
+                        `;
+                    }
+                }
+            }
+
+            // Fetch configuration from ESP on page load
+            fetch('/load-modbus-config')
+            .then(response => response.json())
+            .then(data => updateFormFromESP(data))
+            .catch(error => console.error('Error fetching configuration from ESP:', error));
+        
+            // Call fetchModbusConfig when the page loads
+            window.onload = function() {
+                fetchModbusConfig();
+            };
+        </script>
+
+        <p id="responseMessage" style="margin-top: 20px; color: green;"></p>
+    </div>
+
+    <div id="fileManager" class="tab-content">
+        <h2>File Manager</h2>
+        <div class="file-list">
+            <h3>Uploaded Files</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>File Name</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="fileList"></tbody>
+            </table>
+        </div>
+        <div class="upload-section">
+            <h3>Upload File</h3>
+            <input type="file" id="fileInput">
+            <button onclick="uploadFile()">Upload</button>
+        </div>
+    </div>
+</CENTER>
+    <script>
+        // Tab switching logic
+        function showTab(tabId) {
+            const tabs = document.querySelectorAll('.tab');
+            const contents = document.querySelectorAll('.tab-content');
+
+            tabs.forEach(tab => tab.classList.remove('active'));
+            contents.forEach(content => content.classList.remove('active'));
+
+            document.querySelector(`#${tabId}`).classList.add('active');
+            document.querySelector(`.tab[onclick="showTab('${tabId}')"]`).classList.add('active');
+        }
+
+        // Submit Modbus Configuration
+        function submitConfig() {
+            const form = document.getElementById('modbusConfigForm');
+            const role = form.role.value;
+            const com = form.com.value;
+            const id = parseInt(form.id.value);
+            const slaveip = form.slaveip.value.split(',').map(Number);const tags = Array.from(document.querySelectorAll('input[name="tags[]"]')).map(input => parseInt(input.value)); // Chuyển đổi Tag thành số
+            const values = Array.from(document.querySelectorAll('input[name="values[]"]')).map(input => parseInt(input.value)); // Chuyển đổi Value thành số
+            const types = Array.from(document.querySelectorAll('input[name="types[]"]')).map(input => parseInt(input.value)); // Chuyển đổi Type thành số
+
+            const config = {
+                role: role,
+                Com: com,
+                id: id,
+                slaveip: slaveip,
+                Tag: tags,
+                Value: values,
+                Type: types
+            };
+
+            console.log('Submitting config:', config);
+
+            fetch('/modbus-config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(config) // Chuyển đổi đối tượng thành chuỗi JSON
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Response from server:', data);
+                document.getElementById('responseMessage').textContent = data.status || 'Configuration saved successfully!';
+            })
+            .catch(error => {
+                console.error('Error submitting config:', error);
+                document.getElementById('responseMessage').textContent = 'Error: ' + error.message;
+                document.getElementById('responseMessage').style.color = 'red';
+            });
+        }
+
+        // Fetch and display the list of files
+        function fetchFileList() {
+            fetch('/list-files')
+            .then(response => response.json())
+            .then(files => {
+                const fileList = document.getElementById('fileList');
+                fileList.innerHTML = '';
+                files.forEach(file => {
+                const row = document.createElement('tr');
+                const fileNameCell = document.createElement('td');
+                fileNameCell.textContent = file;
+                const actionCell = document.createElement('td');
+                const deleteButton = document.createElement('button');
+                deleteButton.innerHTML = '<i class="fa fa-trash"></i> Delete';
+                deleteButton.style.backgroundColor = '#f44336';
+                deleteButton.style.color = 'white';
+                deleteButton.onclick = () => deleteFile(file);
+                actionCell.appendChild(deleteButton);
+                row.appendChild(fileNameCell);
+                row.appendChild(actionCell);
+                fileList.appendChild(row);
+                });
+            })
+            .catch(error => console.error('Error fetching file list:', error));
+        }
+
+        // Update styles for Upload and Submit buttons
+        document.querySelector('button[onclick="uploadFile()"]').innerHTML = '<i class="fa fa-upload"></i> Upload';
+        document.querySelector('button[onclick="uploadFile()"]').style.backgroundColor = '#2196F3';
+        document.querySelector('button[onclick="uploadFile()"]').style.color = 'white';
+
+        document.querySelector('button[onclick="submitConfig()"]').innerHTML = '<i class="fa fa-paper-plane"></i> Submit';
+        document.querySelector('button[onclick="submitConfig()"]').style.backgroundColor = '#2196F3';
+        document.querySelector('button[onclick="submitConfig()"]').style.color = 'white';
+
+        // Upload a file
+        function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert('Please select a file to upload.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => {
+                    if (response.ok) {
+                        alert('File uploaded successfully.');
+                        fetchFileList();
+                    } else {
+                        alert('Failed to upload file.');
+                    }
+                })
+                .catch(error => console.error('Error uploading file:', error));
+        }
+
+        // Delete a file
+        function deleteFile(fileName) {
+            fetch(`/delete?file=${encodeURIComponent(fileName)}`, {
+                method: 'DELETE'
+            })
+                .then(response => {
+                    if (response.ok) {
+                        alert('File deleted successfully.');
+                        fetchFileList();
+                    } else {
+                        alert('Failed to delete file.');
+                    }
+                })
+                .catch(error => console.error('Error deleting file:', error));
+        }
+
+        // Fetch the file list on page load
+        fetchFileList();
+    </script>
+</body>
+</html>
