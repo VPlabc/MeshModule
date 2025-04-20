@@ -11,7 +11,7 @@ Modbus_Prog mainModbusCom;
 // #include "Project/lookline.h"
 struct Config {
     uint8_t BrokerAddress[6];
-    int wifiChannel;
+    uint8_t wifiChannel;
     int id;
     int netId;
     String role; // "Broker", "Node", or "Repeater"
@@ -852,10 +852,16 @@ void convertPacketToDataLookline(const uint8_t *data, struct_Parameter_messageOl
     // Chuyển đổi dữ liệu từ packet.data sang DataLookline
     DataLookline.networkID = packet.netId; // Byte 0-1: networkID (2 bytes)
     DataLookline.nodeID = packet.ID; // Byte 0-1: nodeID (2 bytes)
-    DataLookline.PLAN = (data[0] << 8) | data[1]; // Byte 2-3: PLAN (2 bytes)
-    DataLookline.RESULT = (data[2] << 8) | data[3]; // Byte 4-5: RESULT (2 bytes)
-    DataLookline.state = data[4];   // Byte 6: state
-    DataLookline.Mode = data[5];    // Byte 7: Mode
+    DataLookline.PLAN = (data[0] << 8) | data[1]; // Byte 0-1: PLAN (2 bytes)
+    DataLookline.RESULT = (data[2] << 8) | data[3]; // Byte 2-3: RESULT (2 bytes)
+    DataLookline.state = data[4];   // Byte 4: state
+    DataLookline.Mode = data[5];    // Byte 5: Mode
+    #ifdef ChangeChannel
+    if(data[6] != MeshConfig.wifiChannel){
+        MeshConfig.wifiChannel = data[6]; // Byte 6: wifiChannel
+        saveConfig();
+    }
+    #endif//ChangeChannel
 }
 
 uint8_t  incomingData[sizeof(struct dataPacket)];
@@ -872,17 +878,7 @@ void receiveDataPacketFromSerial2() {
             memcpy(&packet, incomingData, sizeof(packet));
             if (MeshConfig.debug) Serial.println("ID: " + String(packet.ID) + " | netId: " + String(packet.netId));
             if (MeshConfig.debug) Serial.println("Data: ");
-            // for (int i = 0; i < sizeof(packet.data); i++){
-            //     if (MeshConfig.debug) Serial.print(packet.data[i], HEX);
-            //     if (MeshConfig.debug) Serial.print(" ");
-            // }
-            // if (MeshConfig.debug) Serial.println();
-            esp_now_peer_info_t peerInfo = {};
-            memcpy(&peerInfo.peer_addr, MeshConfig.BrokerAddress, 6);
-            if (!esp_now_is_peer_exist(MeshConfig.BrokerAddress)) {
-                peerInfo.channel = MeshConfig.wifiChannel;
-                esp_now_add_peer(&peerInfo);
-            }
+
                 // Giả sử packet chứa dữ liệu
                 convertPacketToDataLookline(packet.data, DataLookline);
             if(MeshConfig.debug) {
@@ -1016,15 +1012,25 @@ void setup()
     delay(1000);
     #endif//Gateway
 
-
-    //Set device in STA mode to begin with
-    WiFi.mode(WIFI_STA);
     if (MeshConfig.debug) Serial.println("Start Mesh");
     // Output my MAC address - useful for later
     if (MeshConfig.debug) Serial.print("Device Address: ");
     if (MeshConfig.debug) Serial.println(WiFi.macAddress());
     // shut down wifi
     WiFi.disconnect();
+    // startup ESP Now
+    WiFi.disconnect();
+    WiFi.mode(WIFI_STA);
+    WiFi.disconnect(); // Ngắt kết nối WiFi để đặt lại kênh
+    esp_wifi_set_channel(MeshConfig.wifiChannel, WIFI_SECOND_CHAN_NONE); // Đặt kênh WiFi
+
+    //Set device in STA mode to begin with
+    // 
+    if (MeshConfig.debug) Serial.println("Start Mesh");
+    // Output my MAC address - useful for later
+    if (MeshConfig.debug) Serial.print("Device Address: ");
+    if (MeshConfig.debug) Serial.println(WiFi.macAddress());
+    // shut down wifi
     // startup ESP Now
     
 #ifdef ESP32
@@ -1041,8 +1047,6 @@ void setup()
         {
             esp_now_add_peer(&peerInfo);
         }
-
-
     }
     else
     {
@@ -1050,6 +1054,7 @@ void setup()
         delay(3000);
         ESP.restart();
     }
+
 
 #else//ESP8266
     WiFi.disconnect();        // we do not want to connect to a WiFi network
