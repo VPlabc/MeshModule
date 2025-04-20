@@ -863,9 +863,48 @@ void convertPacketToDataLookline(const uint8_t *data, struct_Parameter_messageOl
     }
     #endif//ChangeChannel
 }
-
+void convertPacketToDataLooklinev1(const uint8_t *data, struct_Parameter_message &DataLooklinev1) {
+    DataLooklinev1.networkID = packet.netId; // Byte 0-1: networkID (2 bytes)
+    DataLooklinev1.nodeID = packet.ID;      // Byte 0-1: nodeID (2 bytes)
+    DataLooklinev1.PLAN = (data[0] << 8) | data[1]; // Byte 0-1: PLAN (2 bytes)
+    DataLooklinev1.RESULT = (data[2] << 8) | data[3]; // Byte 2-3: RESULT (2 bytes)
+    DataLooklinev1.state = data[4];         // Byte 4: state
+    DataLooklinev1.Mode = data[5];          // Byte 5: Mode
+    DataLooklinev1.RSSI = data[6];          // Byte 6: RSSI
+    DataLooklinev1.Com = data[7];           // Byte 7: Communication status
+    DataLooklinev1.WiFi = data[8];          // Byte 8: WiFi status
+    DataLooklinev1.Cmd = data[9];           // Byte 9: Command
+    DataLooklinev1.type = data[10];         // Byte 10: Type
+    DataLooklinev1.Nodecounter = (data[11] << 8) | data[12]; // Byte 11-12: Node counter (2 bytes)
+    // if(DataLooklinev1.networkID != MeshConfig.wifiChannel){
+    //     MeshConfig.wifiChannel = DataLooklinev1.networkID; // Byte 6: wifiChannel  
+    //     WiFi.mode(WIFI_STA);
+    //     WiFi.disconnect(); // Ngắt kết nối WiFi để đặt lại kênh
+    //     esp_wifi_set_channel(MeshConfig.wifiChannel, WIFI_SECOND_CHAN_NONE); // Đặt kênh WiFi
+    //     if (esp_now_init() == ESP_OK)
+    //     {
+    //         if (MeshConfig.debug) Serial.println("Mesh Init Success");
+    //         esp_now_register_recv_cb(receiveCallback);
+    //         esp_now_register_send_cb(sentCallback);
+    //         esp_now_peer_info_t peerInfo = {};
+    //         memcpy(&peerInfo.peer_addr, MeshConfig.BrokerAddress, 6);
+    //         peerInfo.channel = MeshConfig.wifiChannel;
+    //         peerInfo.encrypt = false;
+    //         if (!esp_now_is_peer_exist(MeshConfig.BrokerAddress))
+    //         {
+    //             esp_now_add_peer(&peerInfo);
+    //         }
+    //     }
+    //     else
+    //     {
+    //         if (MeshConfig.debug) Serial.println("Mesh Init Failed");
+    //     }
+    //     saveConfig();
+    // }
+}
 uint8_t  incomingData[sizeof(struct dataPacket)];
 size_t   received_msg_length;
+int SentTime = 0;
 void receiveDataPacketFromSerial2() {
 #ifdef USE_SERIAL1
 #define SerialTTL Serial1
@@ -876,50 +915,69 @@ void receiveDataPacketFromSerial2() {
         received_msg_length = SerialTTL.readBytesUntil('\n', incomingData, sizeof(incomingData));
         if (received_msg_length == sizeof(incomingData)) {  // got a msg from a sensor
             memcpy(&packet, incomingData, sizeof(packet));
+            SentTime++;
+            if(SentTime > 30){SentTime = 0;
             if (MeshConfig.debug) Serial.println("ID: " + String(packet.ID) + " | netId: " + String(packet.netId));
             if (MeshConfig.debug) Serial.println("Data: ");
-
+            
+            esp_now_peer_info_t peerInfo = {};
+            memcpy(&peerInfo.peer_addr, MeshConfig.BrokerAddress, 6);
+            if (!esp_now_is_peer_exist(MeshConfig.BrokerAddress)) {
+                peerInfo.channel = MeshConfig.wifiChannel;
+                esp_now_add_peer(&peerInfo);
+            }
                 // Giả sử packet chứa dữ liệu
-                convertPacketToDataLookline(packet.data, DataLookline);
+                // convertPacketToDataLookline(packet.data, DataLookline);
+                convertPacketToDataLooklinev1(packet.data, DataLooklinev1);
+                
             if(MeshConfig.debug) {
                 // In ra dữ liệu đã chuyển đổi
                 Serial.println("DataLookline:");
                 Serial.print("Network ID: ");
-                Serial.println(DataLookline.networkID);
+                Serial.println(DataLooklinev1.networkID);
                 Serial.print("Node ID: ");
-                Serial.println(DataLookline.nodeID);
+                Serial.println(DataLooklinev1.nodeID);
                 Serial.print("PLAN: ");
-                Serial.println(DataLookline.PLAN);
+                Serial.println(DataLooklinev1.PLAN);
                 Serial.print("RESULT: ");
-                Serial.println(DataLookline.RESULT);
+                Serial.println(DataLooklinev1.RESULT);
                 Serial.print("State: ");
-                Serial.println(DataLookline.state);
+                Serial.println(DataLooklinev1.state);
                 Serial.print("Mode: ");
-                Serial.println(DataLookline.Mode);
+                Serial.println(DataLooklinev1.Mode);
             }
             String id = "";
-          id += String((DataLookline.nodeID / 1000) % 10);
-          id += String((DataLookline.nodeID / 100) % 10);
-          id += String((DataLookline.nodeID / 10) % 10);
-          id += String((DataLookline.nodeID / 1) % 10);
+          id += String((DataLooklinev1.nodeID / 1000) % 10);
+          id += String((DataLooklinev1.nodeID / 100) % 10);
+          id += String((DataLooklinev1.nodeID / 10) % 10);
+          id += String((DataLooklinev1.nodeID / 1) % 10);
+          String networkID = "";
+            networkID += String((DataLooklinev1.networkID / 1000) % 10);
+            networkID += String((DataLooklinev1.networkID / 100) % 10);
+            networkID += String((DataLooklinev1.networkID / 10) % 10);
+            networkID += String((DataLooklinev1.networkID / 1) % 10);
 
           String StringPlan = "";
-          StringPlan += (DataLookline.PLAN / 1000) % 10;
-          StringPlan += (DataLookline.PLAN / 100) % 10;
-          StringPlan += (DataLookline.PLAN / 10) % 10;
-          StringPlan += (DataLookline.PLAN / 1) % 10;
+          StringPlan += (DataLooklinev1.PLAN / 1000) % 10;
+          StringPlan += (DataLooklinev1.PLAN / 100) % 10;
+          StringPlan += (DataLooklinev1.PLAN / 10) % 10;
+          StringPlan += (DataLooklinev1.PLAN / 1) % 10;
 
           String StringResult = "";
-          StringResult += (DataLookline.RESULT / 1000) % 10;
-          StringResult += (DataLookline.RESULT / 100) % 10;
-          StringResult += (DataLookline.RESULT / 10) % 10;
-          StringResult += (DataLookline.RESULT / 1) % 10;
+          StringResult += (DataLooklinev1.RESULT / 1000) % 10;
+          StringResult += (DataLooklinev1.RESULT / 100) % 10;
+          StringResult += (DataLooklinev1.RESULT / 10) % 10;
+          StringResult += (DataLooklinev1.RESULT / 1) % 10;
           String State = "";
-          if(DataLookline.state){State ="1" + String(DataLookline.Mode);}else{State = "0" + String(DataLookline.Mode);}
-          String sentData = id + "04" + "18" + StringPlan + StringResult + State;
+          if(DataLooklinev1.state){State ="1" + String(DataLooklinev1.Mode);}else{State = "0" + String(DataLooklinev1.Mode);}
+          String sentData = id + networkID + "04" + "18" + StringPlan + StringResult + State;
           esp_err_t result;
-            if(MeshConfig.dataVersion == 3){  result = esp_now_send(MeshConfig.BrokerAddress, (uint8_t *) &DataLookline, sizeof(DataLookline));}
-            if(MeshConfig.dataVersion == 0){  result = esp_now_send(MeshConfig.BrokerAddress, (const uint8_t *)sentData.c_str(), sentData.length());}
+
+                if(MeshConfig.dataVersion == 3){  result = esp_now_send(MeshConfig.BrokerAddress, (uint8_t *) &DataLooklinev1, sizeof(DataLooklinev1));}
+                if(MeshConfig.dataVersion == 0){  
+                    result = esp_now_send(MeshConfig.BrokerAddress, (uint8_t *)&DataLooklinev1, sizeof(DataLooklinev1));
+                }
+            
             if (result == ESP_OK)
             {
                 if (MeshConfig.debug) Serial.println("DataPacket sent success");
@@ -946,7 +1004,7 @@ void receiveDataPacketFromSerial2() {
             } else {
                 if (MeshConfig.debug) Serial.println("Unknown error.");
             }
-        
+        }
         }
     }     
 }
