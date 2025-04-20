@@ -1,8 +1,12 @@
+#ifndef TSKMQTT_H
+#define TSKMQTT_H
+
 #include <Arduino.h>
 #include <FS.h>
 #include <ArduinoJson.h>
 #include <WiFiClientSecure.h>
-#include <MQTT.h>
+// #include <MQTT.h>
+#include <AsyncMqttClient.h>
 #include <LittleFS.h>
 
 #define WIFIMQTT_FILE "/wifi_mqtt.json"
@@ -27,15 +31,18 @@ extern String wifiMode;
 extern String ssid;
 extern String pass;
 extern String conId;
+extern String mqttTopicStat;
 extern String mqttTopic;
 extern String mqttTopicSub;
+extern bool mqttIsConnected;
 
 class WifiMqttConfig {
     
     public:
         void setup();
         void loop();
-        void setupWiFi();
+        // void setupWiFi();
+        void MQTTPush(String Topic,String Payload);
         void saveJsonToWifiMqttFile(char &jsonString,bool debug, fs::FS &FileSystem);
         String loadWifiMqttConfig(bool debug, fs::FS &FileSystem);
         // String mqttHost = "broker.hivemq.com";
@@ -51,7 +58,7 @@ class WifiMqttConfig {
         // String mqttTopic = "test/topic";
         // String mqttTopicSub = "test/topic/sub";
 
-        // String conId = "b8e54d33-b34a-45ab-b76f-62c8a9abc6c4";
-        // String mqttTopic = "test/topic";
-        // String mqttTopicSub = "test/topic/sub";
 };
+// WifiMqttConfig   WifiMQTTConfig;
+
+#endif// TSKMQTT_H

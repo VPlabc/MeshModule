@@ -77,10 +77,253 @@
     </div>
 
     <div class="tabs">
+        <div class="tab" onclick="showTab('meshConfig')">Mesh Network</div> 
         <div class="tab active" onclick="showTab('modbusConfig')">Modbus Configuration</div>
+        <div class="tab" onclick="showTab('wifiConfig')">WiFi Configuration</div>
+        <div class="tab" onclick="showTab('mqttConfig')">MQTT Configuration</div>
+        <div class="tab" onclick="showTab('loraConfig')">LoRa E32 Configuration</div>
         <div class="tab" onclick="showTab('fileManager')">File Manager</div>
     </div>
 <CENTER>
+    <div id="loraConfig" class="tab-content">
+        <h2>LoRa E32 Configuration</h2>
+        <form id="loraConfigForm">
+            <div style="margin-bottom: 10px;">
+                <label for="address" style="display: inline-block; width: 150px;">Address:</label>
+                <input type="number" id="address" name="address" placeholder="Enter Address" style="width: 200px;" min="0" max="65535" required>
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="uartSpeed" style="display: inline-block; width: 150px;">UART Speed:</label>
+                <select id="uartSpeed" name="uartSpeed" style="width: 200px;">
+                    <option value="1200_8N1">1200 8N1</option>
+                    <option value="2400_8N1">2400 8N1</option>
+                    <option value="4800_8N1">4800 8N1</option>
+                    <option value="9600_8N1">9600 8N1</option>
+                    <option value="19200_8N1">19200 8N1</option>
+                    <option value="38400_8N1">38400 8N1</option>
+                </select>
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="airRate" style="display: inline-block; width: 150px;">Air Data Rate:</label>
+                <select id="airRate" name="airRate" style="width: 200px;">
+                    <option value="0.3kbps">0.3 kbps</option>
+                    <option value="1.2kbps">1.2 kbps</option>
+                    <option value="2.4kbps">2.4 kbps</option>
+                    <option value="4.8kbps">4.8 kbps</option>
+                    <option value="9.6kbps">9.6 kbps</option>
+                    <option value="19.2kbps">19.2 kbps</option>
+                </select>
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="channel" style="display: inline-block; width: 150px;">Channel:</label>
+                <input type="number" id="channel" name="channel" placeholder="Enter Channel" style="width: 200px;" min="0" max="30" required>
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="transmissionMode" style="display: inline-block; width: 150px;">Transmission Mode:</label>
+                <select id="transmissionMode" name="transmissionMode" style="width: 200px;">
+                    <option value="fixed">Fixed</option>
+                    <option value="transparent">Transparent</option>
+                </select>
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="pullUp" style="display: inline-block; width: 150px;">Pull Up:</label>
+                <input type="checkbox" id="pullUp" name="pullUp">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="fec" style="display: inline-block; width: 150px;">FEC:</label>
+                <input type="checkbox" id="fec" name="fec">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="power" style="display: inline-block; width: 150px;">Power Level:</label>
+                <select id="power" name="power" style="width: 200px;">
+                    <option value="0">1W (30 dBm)</option>
+                    <option value="1">500mW (27 dBm)</option>
+                    <option value="2">250mW (24 dBm)</option>
+                    <option value="3">125mW (21 dBm)</option>
+                </select>
+            </div>
+
+            <button type="button" onclick="submitLoRaConfig()">Submit</button>
+        </form>
+    </div>
+
+    <script>
+        function submitLoRaConfig() {
+            const form = document.getElementById('loraConfigForm');
+            const loraConfig = {
+                address: parseInt(form.address.value),
+                uart_speed: form.uartSpeed.value,
+                air_data_rate: form.airRate.value,
+                channel: parseInt(form.channel.value),
+                transmission_mode: form.transmissionMode.value,
+                pull_up: form.pullUp.checked,
+                fec: form.fec.checked,
+                power: parseInt(form.power.value)
+            };
+
+            console.log('Submitting LoRa E32 config:', loraConfig);
+
+            fetch('/configure-e32', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(loraConfig)
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Response from server:', data);
+                alert(data.status || 'LoRa E32 configuration saved successfully!');
+            })
+            .catch(error => console.error('Error submitting LoRa E32 config:', error));
+        }
+    </script>
+    <div id="meshConfig" class="tab-content">
+        <h2>Mesh Network Configuration</h2>
+        <form id="meshConfigForm">
+            <div style="margin-bottom: 10px;">
+                <label for="brokerAddress" style="display: inline-block; width: 150px;">Broker MAC Address:</label>
+                <input type="text" id="brokerAddress" name="brokerAddress" placeholder="FF:FF:FF:FF:FF:FF" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="wifiChannel" style="display: inline-block; width: 150px;">WiFi Channel:</label>
+                <input type="number" id="wifiChannel" name="wifiChannel" placeholder="Enter Channel" style="width: 200px;" min="1" max="13">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="nodeId" style="display: inline-block; width: 150px;">Node ID:</label>
+                <input type="number" id="nodeId" name="nodeId" placeholder="Enter Node ID" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="netId" style="display: inline-block; width: 150px;">Network ID:</label>
+                <input type="number" id="netId" name="netId" placeholder="Enter Network ID" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="meshrole" style="display: inline-block; width: 150px;">Role:</label>
+                <select id="meshrole" name="meshrole" style="width: 200px;">
+                    <option value="Broker">Broker</option>
+                    <option value="Node">Node</option>
+                    <option value="Repeater">Repeater</option>
+                </select>
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="debug" style="display: inline-block; width: 150px;">Debug:</label>
+                <input type="checkbox" id="debug" name="debug">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="macSlaves" style="display: inline-block; width: 150px;">Slave MAC Addresses:</label>
+                <input type="text" id="macSlaves" name="macSlaves" placeholder="Comma-separated MACs" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="dataVersion" style="display: inline-block; width: 150px;">Data Version:</label>
+                <select id="dataVersion" name="dataVersion" style="width: 200px;">
+                    <option value="0">Lookline v1</option>
+                    <option value="1">Lookline v2</option>
+                    <option value="2">Modbus Register</option>
+                    <option value="3">Serial TTL</option>
+                </select>
+            </div>
+            <button type="button" onclick="submitMeshConfig()">Submit</button>
+        </form>
+    </div>
+    <div id="meshConfig" class="tab-content">
+        <h2>Mesh Network Configuration</h2>
+        <form id="meshConfigForm">
+            <div style="margin-bottom: 10px;">
+                <label for="meshNodeId" style="display: inline-block; width: 150px;">Node ID:</label>
+                <input type="number" id="meshNodeId" name="meshNodeId" placeholder="Enter Node ID" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="meshChannel" style="display: inline-block; width: 150px;">Channel:</label>
+                <input type="number" id="meshChannel" name="meshChannel" placeholder="Enter Channel" style="width: 200px;" min="1" max="13">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="meshRegBit" style="display: inline-block; width: 150px;">Reg Bit:</label>
+                <input type="number" id="meshRegBit" name="meshRegBit" placeholder="Enter Reg Bit" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="meshReg8" style="display: inline-block; width: 150px;">Reg 8:</label>
+                <input type="number" id="meshReg8" name="meshReg8" placeholder="Enter Reg 8" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="meshReg16" style="display: inline-block; width: 150px;">Reg 16:</label>
+                <input type="number" id="meshReg16" name="meshReg16" placeholder="Enter Reg 16" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="meshRole" style="display: inline-block; width: 150px;">Role:</label>
+                <input type="text" id="meshRole" name="meshRole" placeholder="Enter Role" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="meshSSID" style="display: inline-block; width: 150px;">SSID:</label>
+                <input type="text" id="meshSSID" name="meshSSID" placeholder="Enter SSID" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="meshPassword" style="display: inline-block; width: 150px;">Password:</label>
+                <input type="password" id="meshPassword" name="meshPassword" placeholder="Enter Password" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="meshMacAddresses" style="display: inline-block; width: 150px;">MAC Addresses:</label>
+                <input type="text" id="meshMacAddresses" name="meshMacAddresses" placeholder="Enter MAC Addresses (comma-separated)" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="meshModel" style="display: inline-block; width: 150px;">Model:</label>
+                <input type="text" id="meshModel" name="meshModel" placeholder="Enter Model" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="meshNetId" style="display: inline-block; width: 150px;">Net ID:</label>
+                <input type="text" id="meshNetId" name="meshNetId" placeholder="Enter Net ID" style="width: 200px;">
+            </div>
+            <button type="button" onclick="submitMeshConfig()">Submit</button>
+        </form>
+    </div>
+    <div id="wifiConfig" class="tab-content">
+        <h2>WiFi Configuration</h2>
+        <form id="wifiConfigForm">
+            <div style="margin-bottom: 10px;">
+                <label for="wifiMode" style="display: inline-block; width: 150px;">WiFi Mode:</label>
+                <select id="wifiMode" name="wifiMode" style="width: 200px;">
+                    <option value="STA">Station (STA)</option>
+                    <option value="AP">Access Point (AP)</option>
+                </select>
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="ssid" style="display: inline-block; width: 150px;">SSID:</label>
+                <input type="text" id="ssid" name="ssid" placeholder="Enter SSID" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="password" style="display: inline-block; width: 150px;">Password:</label>
+                <input type="password" id="password" name="password" placeholder="Enter Password" style="width: 200px;">
+            </div>
+            <button type="button" onclick="submitWiFiMQTTConfig()">Update</button>
+        </form>
+    </div>
+
+    <div id="mqttConfig" class="tab-content">
+        <h2>MQTT Configuration</h2>
+        <form id="mqttConfigForm">
+            <div style="margin-bottom: 10px;">
+                <label for="mqttHost" style="display: inline-block; width: 150px;">MQTT Host:</label>
+                <input type="text" id="mqttHost" name="mqttHost" placeholder="Enter MQTT Host" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="mqttPort" style="display: inline-block; width: 150px;">MQTT Port:</label>
+                <input type="number" id="mqttPort" name="mqttPort" placeholder="Enter MQTT Port" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="mqttUser" style="display: inline-block; width: 150px;">MQTT User:</label>
+                <input type="text" id="mqttUser" name="mqttUser" placeholder="Enter MQTT User" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="mqttPass" style="display: inline-block; width: 150px;">MQTT Password:</label>
+                <input type="password" id="mqttPass" name="mqttPass" placeholder="Enter MQTT Password" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="mqttEnable" style="display: inline-block; width: 150px;">Enable MQTT:</label>
+                <input type="checkbox" id="mqttEnable" name="mqttEnable">
+            </div>
+            <button type="button" onclick="submitWiFiMQTTConfig()">Update</button>
+        </form>
+    </div>
+
     <div id="modbusConfig" class="tab-content active">
         <h2>Modbus Configuration</h2>
         <form id="modbusConfigForm">
@@ -154,28 +397,101 @@
             <label for="slaveip" style="display: inline-block; width: 150px;">Slave IP:</label>
             <input type="text" id="slaveip" name="slaveip" placeholder="192,168,1,100" required style="width: 200px;">
             </div>
-
-            <!-- <div style="margin-bottom: 10px;">
-            <label for="tags" style="display: inline-block; width: 150px;">Tags:</label>
-            <input type="text" id="tags" name="tags" placeholder="1101,1102,1103" required style="width: 200px;">
-            </div>
-
-            <div style="margin-bottom: 10px;">
-            <label for="values" style="display: inline-block; width: 150px;">Values:</label>
-            <input type="text" id="values" name="values" placeholder="164,166,32" required style="width: 200px;">
-            </div>
-
-            <div style="margin-bottom: 10px;">
-            <label for="types" style="display: inline-block; width: 150px;">Types:</label>
-            <input type="text" id="types" name="types" placeholder="2,2,0" required style="width: 200px;">
-            </div> -->
-
             <button type="button" onclick="submitConfig()">Submit</button>
         </form>
 
-        <script>
-            // Function to update form values from ESP data
-            function updateFormFromESP(data) {
+        <p id="responseMessage" style="margin-top: 20px; color: green;"></p>
+    </div>
+
+    <div id="fileManager" class="tab-content">
+        <h2>File Manager</h2>
+        <div class="file-list">
+            <h3>Uploaded Files</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>File Name</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="fileList"></tbody>
+            </table>
+        </div>
+        <div class="upload-section">
+            <h3>Upload File</h3>
+            <input type="file" id="fileInput">
+            <button onclick="uploadFile()">Upload</button>
+        </div>
+    </div>
+</CENTER>
+    <script>
+         // Tab switching logic
+         function showTab(tabId) {
+            const tabs = document.querySelectorAll('.tab');
+            const contents = document.querySelectorAll('.tab-content');
+
+            tabs.forEach(tab => tab.classList.remove('active'));
+            contents.forEach(content => content.classList.remove('active'));
+
+            document.querySelector(`#${tabId}`).classList.add('active');
+            document.querySelector(`.tab[onclick="showTab('${tabId}')"]`).classList.add('active');
+        }
+
+        function loadWiFiMQTTConfig() {
+        fetch('/load-wifi-mqtt-config/')
+            .then(response => response.json())
+            .then(data => {
+                // Populate WiFi Configuration
+                document.getElementById('wifiMode').value = data.wifiMode || 'STA';
+                document.getElementById('ssid').value = data.ssid || '';
+                document.getElementById('password').value = data.password || '';
+
+                // Populate MQTT Configuration
+                document.getElementById('mqttHost').value = data.mqttHost || '';
+                document.getElementById('mqttPort').value = data.mqttPort || '';
+                document.getElementById('mqttUser').value = data.mqttUser || '';
+                document.getElementById('mqttPass').value = data.mqttPass || '';
+                document.getElementById('mqttEnable').checked = data.mqttEnable || false; // Set the checkbox state
+            })
+            .catch(error => console.error('Error loading WiFi and MQTT config:', error));
+        }
+
+        // Submit WiFi and MQTT Configuration
+        function submitWiFiMQTTConfig() {
+            const wifiConfig = {
+                wifiMode: document.getElementById('wifiMode').value,
+                ssid: document.getElementById('ssid').value,
+                password: document.getElementById('password').value,
+            };
+
+            const mqttConfig = {
+                mqttHost: document.getElementById('mqttHost').value,
+                mqttPort: parseInt(document.getElementById('mqttPort').value),
+                mqttUser: document.getElementById('mqttUser').value,
+                mqttPass: document.getElementById('mqttPass').value,
+                mqttEnable: document.getElementById('mqttEnable').checked // Get the checkbox state
+            };
+
+            const combinedConfig = { ...wifiConfig, ...mqttConfig };
+
+            console.log('Submitting combined config:', combinedConfig);
+
+            fetch('/save-wifi-mqtt-config/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(combinedConfig),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Response from server:', data);
+                    alert(data.status || 'Configuration saved successfully!');
+                })
+                .catch(error => console.error('Error submitting WiFi and MQTT config:', error));
+        }
+        // Function to update form values from ESP data
+        function updateFormFromESP(data) {
                 // Cập nhật các trường đơn lẻ
                 document.getElementById('role').value = data.role || 'master';
                 document.getElementById('com').value = data.Com || 'TCP/IP';
@@ -204,48 +520,122 @@
             .then(response => response.json())
             .then(data => updateFormFromESP(data))
             .catch(error => console.error('Error fetching configuration from ESP:', error));
-        
-            // Call fetchModbusConfig when the page loads
-            window.onload = function() {
-                fetchModbusConfig();
+        // Submit Mesh Network Configuration
+        function submitMeshConfig() {
+            const meshConfig = {
+                type: "ConfigPacket",
+                mac: "FF:FF:FF:FF:FF:FF", // Thay bằng giá trị MAC thực tế nếu cần
+                node_id: parseInt(document.getElementById('meshNodeId').value) || 1,
+                chan: parseInt(document.getElementById('meshChannel').value) || 1,
+                regBit: parseInt(document.getElementById('meshRegBit').value) || 170,
+                reg8: parseInt(document.getElementById('meshReg8').value) || 255,
+                reg16: parseInt(document.getElementById('meshReg16').value) || 65535,
+                role: document.getElementById('meshRole').value || "Broker",
+                ssid: document.getElementById('meshSSID').value || "I-Soft",
+                password: document.getElementById('meshPassword').value || "i-soft@2023",
+                macAddresses: document.getElementById('meshMacAddresses').value.split(',').map(mac => mac.trim()) || [],
+                model: document.getElementById('meshModel').value || "V15",
+                netId: document.getElementById('meshNetId').value || "101"
             };
-        </script>
 
-        <p id="responseMessage" style="margin-top: 20px; color: green;"></p>
-    </div>
+            console.log('Submitting Mesh Network config:', meshConfig);
 
-    <div id="fileManager" class="tab-content">
-        <h2>File Manager</h2>
-        <div class="file-list">
-            <h3>Uploaded Files</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>File Name</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody id="fileList"></tbody>
-            </table>
-        </div>
-        <div class="upload-section">
-            <h3>Upload File</h3>
-            <input type="file" id="fileInput">
-            <button onclick="uploadFile()">Upload</button>
-        </div>
-    </div>
-</CENTER>
-    <script>
-        // Tab switching logic
-        function showTab(tabId) {
-            const tabs = document.querySelectorAll('.tab');
-            const contents = document.querySelectorAll('.tab-content');
+            fetch('/save-mesh-config/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(meshConfig),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Response from server:', data);
+                    alert(data.status || 'Mesh Network configuration saved successfully!');
+                })
+                .catch(error => console.error('Error submitting Mesh Network config:', error));
+        }
+        // Function to submit Mesh Configuration
+        function submitMeshConfig() {
+            const form = document.getElementById('meshConfigForm');
+            const meshConfig = {
+                BrokerAddress: form.brokerAddress.value.split(':').map(part => parseInt(part, 16)), // Convert MAC address to array of integers
+                wifiChannel: parseInt(form.wifiChannel.value),
+                id: parseInt(form.nodeId.value),
+                netId: parseInt(form.netId.value),
+                role: form.role.value,
+                debug: form.debug.checked,
+                macSlaves: form.macSlaves.value.split(',').map(mac => mac.trim()), // Split and trim MAC addresses
+                dataVersion: parseInt(form.dataVersion.value)
+            };
 
-            tabs.forEach(tab => tab.classList.remove('active'));
-            contents.forEach(content => content.classList.remove('active'));
+            console.log('Submitting Mesh config:', meshConfig);
 
-            document.querySelector(`#${tabId}`).classList.add('active');
-            document.querySelector(`.tab[onclick="showTab('${tabId}')"]`).classList.add('active');
+            fetch('/save-mesh-config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(meshConfig)
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Response from server:', data);
+                alert(data.status || 'Mesh configuration saved successfully!');
+            })
+            .catch(error => console.error('Error submitting Mesh config:', error));
+        }
+
+        // Function to load Mesh Configuration
+        function loadMeshConfig() {
+            fetch('/load-mesh-config')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('brokerAddress').value = Array.isArray(data.BrokerAddress) && data.BrokerAddress.length > 0 
+                        ? data.BrokerAddress.map(byte => byte.toString(16).padStart(2, '0')).join(':') 
+                        : '';
+                    document.getElementById('wifiChannel').value = data.wifiChannel || '';
+                    document.getElementById('nodeId').value = data.id || '';
+                    document.getElementById('netId').value = data.netId || '';
+                    document.getElementById('meshrole').value = data.role || 'Node';
+                    document.getElementById('debug').checked = data.debug || false;
+                    document.getElementById('macSlaves').value = data.macSlaves ? data.macSlaves.join(',') : '';
+                    document.getElementById('dataVersion').value = data.dataVersion || 0;
+                })
+                .catch(error => console.error('Error loading Mesh config:', error));
+        }
+        
+
+        // Call loadWiFiMQTTConfig when the page loads
+        window.onload = function () {
+            loadWiFiMQTTConfig();
+            loadMeshConfig();
+        };
+
+        // Submit MQTT Configuration
+        function submitMQTTConfig() {
+            const form = document.getElementById('mqttConfigForm');
+            const mqttConfig = {
+                mqttHost: form.mqttHost.value,
+                mqttPort: parseInt(form.mqttPort.value),
+                mqttUser: form.mqttUser.value,
+                mqttPass: form.mqttPass.value
+            };
+
+            console.log('Submitting MQTT config:', mqttConfig);
+
+            fetch('/mqtt-config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(mqttConfig)
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Response from server:', data);
+                alert(data.status || 'MQTT configuration saved successfully!');
+            })
+            .catch(error => console.error('Error submitting MQTT config:', error));
         }
 
         // Submit Modbus Configuration

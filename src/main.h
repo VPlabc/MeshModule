@@ -1,8 +1,8 @@
 #define USE_LITTLEFS // Ensure LittleFS is used
 // #define ESP32_RISCV
 
-#define USE_SERIAL2 // Ensure Serial2 is used
-// #define USE_SERIAL1 // Ensure Serial1 is used
+// #define USE_SERIAL2 // Ensure Serial2 is used
+#define USE_SERIAL1 // Ensure Serial1 is used
 #ifdef USE_SERIAL1
 #define USE_Modbus
 #define USE_MQTT
@@ -43,6 +43,8 @@
 #include <freertos/queue.h>
 #include <freertos/task.h>
 
+
+
 #define CONFIG_FILE "/config.json"
 #define MACLIST_FILE "/maclist.json"
 #define SETUP_BUTTON  26 // GPIO 0
@@ -73,6 +75,8 @@ void saveMacToMacList(const uint8_t *macAddr, int id);
 void receiveDataPacketFromSerial2();
 void receiveCallback(const uint8_t *senderMac, const uint8_t *data, int dataLen);
 void sentCallback(const uint8_t *macAddr, esp_now_send_status_t status);
+void SupendTask();
+void ResumeTask();
 #endif//Gateway
 #define Se_dRX_PIN 2//4
 #define Se_TX_PIN 15//5
