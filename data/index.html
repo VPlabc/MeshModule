@@ -558,11 +558,11 @@
         function submitMeshConfig() {
             const form = document.getElementById('meshConfigForm');
             const meshConfig = {
-                BrokerAddress: form.brokerAddress.value.split(':').map(part => parseInt(part, 16)), // Convert MAC address to array of integers
+                BrokerAddress: form.brokerAddress.value, // Save MAC address as a string
                 wifiChannel: parseInt(form.wifiChannel.value),
                 id: parseInt(form.nodeId.value),
                 netId: parseInt(form.netId.value),
-                role: form.role.value,
+                role: form.meshrole.value,
                 debug: form.debug.checked,
                 macSlaves: form.macSlaves.value.split(',').map(mac => mac.trim()), // Split and trim MAC addresses
                 dataVersion: parseInt(form.dataVersion.value)

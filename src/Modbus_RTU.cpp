@@ -131,6 +131,7 @@ String connId[4] = {"connId1", "connId2", "connId3", "connId4"};
 String Tag[40] = {"tag1", "tag2", "tag3", "tag4"};
 JSONVar iMagSetting;
 
+extern JSONVar iMagSetting;
 extern String connId[4];
 extern String Tag[40];
 extern int AddrOffset;

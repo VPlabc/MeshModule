@@ -108,7 +108,7 @@ void WebinterFace::setupWebConfig() {
         serializeJson(doc, jsonConfig);
 
         // Call the configureE32 function with the JSON string
-        configLoRa.configureE32(jsonConfig);
+        // configLoRa.configureE32(jsonConfig);
 
         request->send(200, "application/json", "{\"status\":\"Configuration applied\"}");
     });

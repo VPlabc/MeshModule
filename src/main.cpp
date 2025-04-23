@@ -13,6 +13,53 @@ LoRaFunction mainLoRa;
 #ifdef USE_Modbus
 #include "Modbus_RTU.h"
 Modbus_Prog mainModbusCom;
+#ifdef Module_10O4I
+// Adafruit_MCP23008 mcp;
+// /**************************** KIEM TRA OUTPUT *********************************/
+// void Test_OUTPUT(int timer) {
+//     delay(timer);
+//     Y0_OFF; Y1_OFF; Y2_OFF; Y3_OFF; Y4_OFF; Y5_OFF; Y6_OFF; Y7_OFF; Y8_OFF; Y9_OFF;
+//     Y0_ON; delay(timer);
+//     Y0_OFF; Y1_OFF; Y2_OFF; Y3_OFF; Y4_OFF; Y5_OFF; Y6_OFF; Y7_OFF; Y8_OFF; Y9_OFF;
+//     Y1_ON; delay(timer);
+//     Y0_OFF; Y1_OFF; Y2_OFF; Y3_OFF; Y4_OFF; Y5_OFF; Y6_OFF; Y7_OFF; Y8_OFF; Y9_OFF;
+//     Y2_ON; delay(timer);
+//     Y0_OFF; Y1_OFF; Y2_OFF; Y3_OFF; Y4_OFF; Y5_OFF; Y6_OFF; Y7_OFF; Y8_OFF; Y9_OFF;
+//     Y3_ON; delay(timer);
+//     Y0_OFF; Y1_OFF; Y2_OFF; Y3_OFF; Y4_OFF; Y5_OFF; Y6_OFF; Y7_OFF; Y8_OFF; Y9_OFF;
+//     Y4_ON; delay(timer);
+//     Y0_OFF; Y1_OFF; Y2_OFF; Y3_OFF; Y4_OFF; Y5_OFF; Y6_OFF; Y7_OFF; Y8_OFF; Y9_OFF;
+//     Y5_ON; delay(timer);
+//     Y0_OFF; Y1_OFF; Y2_OFF; Y3_OFF; Y4_OFF; Y5_OFF; Y6_OFF; Y7_OFF; Y8_OFF; Y9_OFF;
+//     Y6_ON; delay(timer);
+//     Y0_OFF; Y1_OFF; Y2_OFF; Y3_OFF; Y4_OFF; Y5_OFF; Y6_OFF; Y7_OFF; Y8_OFF; Y9_OFF;
+//     Y7_ON; delay(timer);
+//     Y0_OFF; Y1_OFF; Y2_OFF; Y3_OFF; Y4_OFF; Y5_OFF; Y6_OFF; Y7_OFF; Y8_OFF; Y9_OFF;
+//     Y8_ON; delay(timer);
+//     Y0_OFF; Y1_OFF; Y2_OFF; Y3_OFF; Y4_OFF; Y5_OFF; Y6_OFF; Y7_OFF; Y8_OFF; Y9_OFF;
+//     Y9_ON; delay(timer);
+//     Y0_OFF; Y1_OFF; Y2_OFF; Y3_OFF; Y4_OFF; Y5_OFF; Y6_OFF; Y7_OFF; Y8_OFF; Y9_OFF;
+//     Y8_ON; delay(timer);
+//     Y0_OFF; Y1_OFF; Y2_OFF; Y3_OFF; Y4_OFF; Y5_OFF; Y6_OFF; Y7_OFF; Y8_OFF; Y9_OFF;
+//     Y7_ON; delay(timer);
+//     Y0_OFF; Y1_OFF; Y2_OFF; Y3_OFF; Y4_OFF; Y5_OFF; Y6_OFF; Y7_OFF; Y8_OFF; Y9_OFF;
+//     Y6_ON; delay(timer);
+//     Y0_OFF; Y1_OFF; Y2_OFF; Y3_OFF; Y4_OFF; Y5_OFF; Y6_OFF; Y7_OFF; Y8_OFF; Y9_OFF;
+//     Y5_ON; delay(timer);
+//     Y0_OFF; Y1_OFF; Y2_OFF; Y3_OFF; Y4_OFF; Y5_OFF; Y6_OFF; Y7_OFF; Y8_OFF; Y9_OFF;
+//     Y4_ON; delay(timer);
+//     Y0_OFF; Y1_OFF; Y2_OFF; Y3_OFF; Y4_OFF; Y5_OFF; Y6_OFF; Y7_OFF; Y8_OFF; Y9_OFF;
+//     Y3_ON; delay(timer);
+//     Y0_OFF; Y1_OFF; Y2_OFF; Y3_OFF; Y4_OFF; Y5_OFF; Y6_OFF; Y7_OFF; Y8_OFF; Y9_OFF;
+//     Y2_ON; delay(timer);
+//     Y0_OFF; Y1_OFF; Y2_OFF; Y3_OFF; Y4_OFF; Y5_OFF; Y6_OFF; Y7_OFF; Y8_OFF; Y9_OFF;
+//     Y1_ON; delay(timer);
+//     Y0_OFF; Y1_OFF; Y2_OFF; Y3_OFF; Y4_OFF; Y5_OFF; Y6_OFF; Y7_OFF; Y8_OFF; Y9_OFF;
+//     Y0_ON; delay(timer);
+//     Y0_OFF; Y1_OFF; Y2_OFF; Y3_OFF; Y4_OFF; Y5_OFF; Y6_OFF; Y7_OFF; Y8_OFF; Y9_OFF;
+//   }
+#endif//Module_10O4I
+
 #endif//USE_Modbus   
 // #include "Project/lookline.h"
 struct Config {
@@ -83,6 +130,87 @@ void convertDataPacketToDataLookline(const dataPacket &packet, struct_Parameter_
 //#define TCP_ETH
 #define RTU_RS485
 
+
+uint8_t current_protocol;
+wifi_interface_t current_wifi_interface;
+/////////////////////////////////////////////// WIFI RF Function /////////////////////////////////////////////////
+byte rssi_display = 0;
+typedef struct {
+  unsigned frame_ctrl: 16;
+  unsigned duration_id: 16;
+  uint8_t addr1[6]; /* receiver address */
+  uint8_t addr2[6]; /* sender address */
+  uint8_t addr3[6]; /* filtering address */
+  unsigned sequence_ctrl: 16;
+  uint8_t addr4[6]; /* optional */
+} wifi_ieee80211_mac_hdr_t;
+
+typedef struct {
+  wifi_ieee80211_mac_hdr_t hdr;
+  uint8_t payload[0]; /* network data ended with 4 bytes csum (CRC32) */
+} wifi_ieee80211_packet_t;
+//La callback que hace la magia
+void promiscuous_rx_cb(void *buf, wifi_promiscuous_pkt_type_t type) {
+  // All espnow traffic uses action frames which are a subtype of the mgmnt frames so filter out everything else.
+  if (type != WIFI_PKT_MGMT)
+    return;
+
+  const wifi_promiscuous_pkt_t *ppkt = (wifi_promiscuous_pkt_t *)buf;
+  const wifi_ieee80211_packet_t *ipkt = (wifi_ieee80211_packet_t *)ppkt->payload;
+  const wifi_ieee80211_mac_hdr_t *hdr = &ipkt->hdr;
+
+  int rssi = ppkt->rx_ctrl.rssi;
+  rssi_display = rssi;
+}
+void Mainloop(); 
+void init_wifi_promiscuous_mode() {
+  esp_wifi_set_protocol(current_wifi_interface, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N); // Set the WiFi protocol
+  // Set the WiFi to promiscuous mode
+//   esp_wifi_set_promiscuous(true);
+//   esp_wifi_set_promiscuous_rx_cb(&promiscuous_rx_cb);
+//   esp_wifi_set_channel(MeshConfig.wifiChannel, WIFI_SECOND_CHAN_NONE); // Set the WiFi channel
+//   esp_wifi_set_protocol(current_wifi_interface, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N | WIFI_PROTOCOL_LR); // Set the WiFi protocol
+//   wifi_interface_t current_wifi_interface = WIFI_IF_STA; // Sử dụng giao diện Wi-Fi Station
+//   esp_wifi_set_ps(WIFI_PS_NONE); // Disable power save mode
+  esp_wifi_set_max_tx_power(78); // 78 tương ứng với 20 dBm
+  
+}
+void init_wifi() {
+  // Set the WiFi to station mode
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect(); // Disconnect from any existing networks
+  esp_wifi_set_channel(MeshConfig.wifiChannel, WIFI_SECOND_CHAN_NONE); // Set the WiFi channel
+  esp_wifi_set_protocol(current_wifi_interface, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G ); // Set the WiFi protocol
+  esp_wifi_set_ps(WIFI_PS_NONE); // Disable power save mode
+  esp_wifi_set_promiscuous(false);
+
+}
+
+int check_protocol()
+{
+  // CONFIG::read_byte (EP_EEPROM_DEBUG, &MeshDebug);
+    char error_buf1[100];
+  // if(MeshDebug){
+    LOGLN();
+     esp_err_t error_code = esp_wifi_get_protocol(current_wifi_interface, &current_protocol);
+     esp_err_to_name_r(error_code,error_buf1,100);
+     LOG("esp_wifi_get_protocol error code: ");
+     LOGLN(error_buf1);
+    LOGLN("Code: " + String(current_protocol));
+    if ((current_protocol&WIFI_PROTOCOL_11B) == WIFI_PROTOCOL_11B)
+      LOGLN("Protocol is WIFI_PROTOCOL_11B");
+    if ((current_protocol&WIFI_PROTOCOL_11G) == WIFI_PROTOCOL_11G)
+      LOGLN("Protocol is WIFI_PROTOCOL_11G");
+    if ((current_protocol&WIFI_PROTOCOL_11N) == WIFI_PROTOCOL_11N)
+      LOGLN("Protocol is WIFI_PROTOCOL_11N");
+    if ((current_protocol&WIFI_PROTOCOL_LR) == WIFI_PROTOCOL_LR)
+      LOGLN("Protocol is WIFI_PROTOCOL_LR");
+    LOGLN("___________________________________");
+    LOGLN();
+    LOGLN();
+  // }
+    return current_protocol;
+}
 
 #ifdef USE_Modbus
 #include "TskModbus.h"
@@ -270,6 +398,13 @@ void loadConfig() {
     MeshConfig.macSlaves = doc["macSlaves"].as<JsonArray>();
     file.close();
     if (MeshConfig.debug) Serial.println("Config loaded.");
+
+    // mainLoRa.SetPinLoRa(2, 15, 17, 16); // Set LoRa pins
+    // mainLoRa.SetChanel(21); // Set LoRa channel
+    // mainLoRa.WriteLoRaConfig(21); // Write LoRa config
+    // mainLoRa.ReadLoRaConfig(); // Read LoRa config
+    mainLoRa.LoRaSetup(MeshConfig.id);
+
 }
 
 void saveConfig() {
@@ -666,6 +801,10 @@ void processQueue() {
             Serial.println(packet.ID);
         }
         #ifdef USE_Modbus
+            digitalWrite(LED_STT, !digitalRead(LED_STT)); // Toggle LED state
+            delay(100);
+            digitalWrite(LED_STT, !digitalRead(LED_STT)); // Toggle LED state
+
                     // mainModbusCom.ModbusGetData(packet.data, sizeof(packet.data));
                 if (MeshConfig.debug) Serial.println("DataPacket received dataVersion = 2):");   
                 if (MeshConfig.debug) Serial.print("ID: " + String(packet.ID) + " | ");
@@ -790,6 +929,7 @@ void Broker(const String &message)
 unsigned long buttonPressTime = 0;
 
 void startConfigPortal() {
+    check_protocol();
     // WiFi.onEvent(WiFiEvent);
     // Set up the access point for configuration mode
     #ifdef USE_Modbus
@@ -819,6 +959,7 @@ void checkConfigButton() {
         }
         else if(millis() - buttonPressTime > 3000 && millis() - buttonPressTime < 5000) { // Nhấn giữ 3s
             if(!configMode) {
+                init_wifi();
                 startConfigPortal();
             }
         }
@@ -1032,6 +1173,16 @@ void TskModbus(void *pvParameter)
         checkConfigButton();// Button Setup
         processSerialInput();// Serial input cmnd processing
         processQueue();
+        if(configMode){
+            dnsServer.processNextRequest();
+            static long timeCount = 0;
+            if (millis() - timeCount >= 200) {
+                timeCount = millis();
+                digitalWrite(LED_STT, !digitalRead(LED_STT)); // Toggle LED state
+            }
+        } 
+
+        Mainloop();
     }
 }
 void TaskWifiMQTT(void *pvParameter)
@@ -1039,16 +1190,16 @@ void TaskWifiMQTT(void *pvParameter)
     LOG("TaskMQTT Run in core ");
     LOGLN(xPortGetCoreID());
     #ifdef USE_Modbus
-    MQTTwifiConfig.setup();
     #endif//USE_Modbus
     for (;;)
     {
-        #ifdef USE_Modbus
-        MQTTwifiConfig.loop();
-        #endif//USE_Modbus
 
     }
+        
 }
+
+
+
 //////////////////////////////////////////////////////////////////////////////////////////////////
 void setup()
 {
@@ -1070,26 +1221,35 @@ void setup()
     }
     loadConfig();
     printConfig();
-    pinMode(M0_PIN, OUTPUT);
-    pinMode(M1_PIN, OUTPUT);
-    pinMode(M0_PIN_1, OUTPUT);
-    pinMode(M1_PIN_1, OUTPUT);
-    digitalWrite(M0_PIN, LOW);
-    digitalWrite(M1_PIN, LOW);
-    digitalWrite(M0_PIN_1, LOW);
-    digitalWrite(M1_PIN_1, LOW);
+    
+    Serial.println("MQTT Wifi Settup");    
+    MQTTwifiConfig.setup();
+    
+    // mainModbusSetting = JSON.parse(mainModbusConfig.loadModbusConfig(MeshConfig.debug, FileSystem));
+
+    // pinMode(M0_PIN, OUTPUT);
+    // pinMode(M1_PIN, OUTPUT);
+    // pinMode(M0_PIN_1, OUTPUT);
+    // pinMode(M1_PIN_1, OUTPUT);
+    // digitalWrite(M0_PIN, LOW);
+    // digitalWrite(M1_PIN, LOW);
+    // digitalWrite(M0_PIN_1, LOW);
+    // digitalWrite(M1_PIN_1, LOW);
     #ifdef USE_Modbus
         // Truyền chuỗi JSON vào hàm ModbusInit
         String  StrConfig = mainModbusConfig.loadModbusConfig(MeshConfig.debug, FileSystem);
-        // LOGLN(StrConfig);
-        ModbusInit(StrConfig);
+        LOGLN("Modbus Init: " + String(MobusInited));
+        if(MobusInited)ModbusInit(StrConfig);
     #endif//USE_Modbus
     delay(1000);
     #endif//Gateway
-    WiFi.disconnect();
-    WiFi.mode(WIFI_STA);
-    WiFi.disconnect(); // Ngắt kết nối WiFi để đặt lại kênh
-    esp_wifi_set_channel(MeshConfig.wifiChannel, WIFI_SECOND_CHAN_NONE); // Đặt kênh WiFi
+    if(wifiMode == "AP"){
+        Serial.println("disconnect WiFi AP mode");
+        WiFi.disconnect();
+        WiFi.mode(WIFI_STA);
+        WiFi.disconnect(); // Ngắt kết nối WiFi để đặt lại kênh
+        esp_wifi_set_channel(MeshConfig.wifiChannel, WIFI_SECOND_CHAN_NONE); // Đặt kênh WiFi
+    }
     WiFi.mode(WIFI_STA);
 
     //Set device in STA mode to begin with
@@ -1100,7 +1260,10 @@ void setup()
     if (MeshConfig.debug) Serial.println(WiFi.macAddress());
     // shut down wifi
     // startup ESP Now
-    
+    uint8_t currentChannel;
+    esp_wifi_get_channel(&currentChannel, 0);
+    Serial.print("Current WiFi Channel: ");
+    Serial.println(currentChannel);
 #ifdef ESP32
     if (esp_now_init() == ESP_OK)
     {
@@ -1115,6 +1278,8 @@ void setup()
         {
             esp_now_add_peer(&peerInfo);
         }
+        // if(wifiMode == "AP"){ init_wifi_promiscuous_mode();}
+        check_protocol();
     }
     else
     {
@@ -1123,7 +1288,7 @@ void setup()
         ESP.restart();
     }
     #ifdef USE_Modbus
-    xTaskCreatePinnedToCore(TaskWifiMQTT, "TaskMain", 10000, NULL, 1, &TaskMQTT, 1);
+    // xTaskCreatePinnedToCore(TaskWifiMQTT, "TaskMain", 10000, NULL, 1, &TaskMQTT, 1);
     #endif//USE_Modbus
 #else//ESP8266
     WiFi.disconnect();        // we do not want to connect to a WiFi network
@@ -1144,172 +1309,196 @@ void setup()
     pinMode(LED_STT, OUTPUT);
     digitalWrite(LED_STT, LOW); // turn off the LED
     #ifdef USE_Modbus
-    mainModbusSetting = JSON.parse(mainModbusConfig.loadModbusConfig(MeshConfig.debug, FileSystem));
+    rtcTimeOnl.Time_setup();    
     #endif//USE_Modbus
-    xTaskCreatePinnedToCore(TskModbus, "TaskModbus", 5000, NULL, 2, &TaskModbus, 1);
-    mainLoRa.LoRaSetup();
-    rtcTimeOnl.Time_setup();
+    if(MobusInited == true){
+        xTaskCreatePinnedToCore(TskModbus, "TaskModbus", 10000, NULL, 2, &TaskModbus, 1);
+    }
+    // mainLoRa.LoRaSetup();
+#ifdef Module_10O4I
+    pinMode(BUZZ, OUTPUT);
+    pinMode(Y8, OUTPUT);
+    pinMode(Y9, OUTPUT);
+    digitalWrite(BUZZ, HIGH);delay(100);digitalWrite(BUZZ, LOW);
+#endif
 }
 long timeCount = 0;
-void loop()
-{
-    // mainLoRa.LoRaLoop();
-    if(MeshConfig.dataVersion == 3 || MeshConfig.dataVersion == 0){receiveDataPacketFromSerial2();}//Data version3: Send recive data from Serial2 to Mesh
-    if(MeshConfig.role == "Broker"){receiveDataPacketFromSerial2();}//Data version3: Send recive data from Serial2 to Mesh
-    static int randomDelay = 3000;
-    static long ModbusCurrentMillis = millis();
-    if(millis() -  ModbusCurrentMillis >= 3000) {randomDelay = random(2500, 3000);
-        ModbusCurrentMillis = millis();
-        #ifdef USE_MQTT
-        if(WiFi.status() == WL_CONNECTED && mqttIsConnected == true) {
-            String payloadSent = "";
-            String DataAt = "";
-            String TimeAt = String(Getyear) + "-" + String(Getmonth) + "-" + String(Getday) + " " + String(Gethour) + ":" + String(Getmin) + ":" + String(Getsec);
-            rtcTimeOnl.Time_loop();rtcTimeOnl.GetTime();
-                if((int)mainModbusSetting["Type"][0] == 0){
-                    DataAt = "{\"key\":\""+ String((int)mainModbusSetting["Tag"][0]) + "\",\"value\":" + String(mainModbusCom.GetCoilReg((int)mainModbusSetting["Value"][0])) + "}" ;
-                }
-                if((int)mainModbusSetting["Type"][0] == 1){
-                    DataAt = "{\"key\":\""+ String((int)mainModbusSetting["Tag"][0]) + "\",\"value\":" + String(mainModbusCom.GetHoldingReg((int)mainModbusSetting["Value"][0])) + "}" ;
-                }
-                if((int)mainModbusSetting["Type"][0] == 2){
-                    uint32_t dwordValue = mainModbusCom.DWORD(
-                        mainModbusCom.GetHoldingReg((int)mainModbusSetting["Value"][0]), 
-                        mainModbusCom.GetHoldingReg(((int)mainModbusSetting["Value"][0]) + 1));
-                    DataAt = "{\"key\":\""+ String((int)mainModbusSetting["Tag"][0]) + "\",\"value\":" + String(dwordValue) + "}" ;
-                }
-                if((int)mainModbusSetting["Type"][0] == 3){
-                    DataAt = "{\"key\":\""+ String((int)mainModbusSetting["Tag"][0]) + "\",\"value\":" + String(
-                        (float)(mainModbusCom.DWORD(
-                            mainModbusCom.GetHoldingReg((int)mainModbusSetting["Value"][0]), 
-                            mainModbusCom.GetHoldingReg(((int)mainModbusSetting["Value"][0])+ 1)))
-                        ) + "}" ;
-                }
-            for (int i = 1; i < (int)mainModbusSetting["Value"].length(); i++) {
-                if((int)mainModbusSetting["Type"][i] == 0){
-                    DataAt += ",{\"key\":\""+ String((int)mainModbusSetting["Tag"][i]) + "\",\"value\":" + String(
-                        mainModbusCom.GetCoilReg((int)mainModbusSetting["Value"][i])) + "}" ;
-                }
-                if((int)mainModbusSetting["Type"][i] == 1){
-                    DataAt += ",{\"key\":\""+ String((int)mainModbusSetting["Tag"][i]) + "\",\"value\":" + String(
-                        mainModbusCom.GetHoldingReg((int)mainModbusSetting["Value"][i])) + "}" ;
-                }
-                if((int)mainModbusSetting["Type"][i] == 2){
-                    uint32_t dwordValue = mainModbusCom.DWORD(
-                        mainModbusCom.GetHoldingReg((int)mainModbusSetting["Value"][i]),
-                        mainModbusCom.GetHoldingReg(((int)mainModbusSetting["Value"][i]) + 1));
-                    DataAt += ",{\"key\":\""+ String((int)mainModbusSetting["Tag"][i]) + "\",\"value\":\"" + String(dwordValue) + "}" ;
-                }
-                if((int)mainModbusSetting["Type"][i] == 3){
-                    DataAt += ",{\"key\":\""+ String((int)mainModbusSetting["Tag"][i]) + "\",\"value\":\"" + String(
-                        (float)(mainModbusCom.DWORD(
-                            mainModbusCom.GetHoldingReg((int)mainModbusSetting["Value"][i]), 
-                            mainModbusCom.GetHoldingReg(((int)mainModbusSetting["Value"][i])+ 1)))
-                        ) + "}" ;
-                }
-            }
-            payloadSent = "{\"connId\":\"" + String(conId) + "\",\"data\":[" + DataAt + "],\"exeAt\":\"" + String(TimeAt)+"\"}";
-            MQTTwifiConfig.MQTTPush(mqttTopic, payloadSent);payloadSent = "";
+void loop(){
+
+}
+void Mainloop()
+{   
+    if(MeshConfig.role == "Broker"){receiveDataPacketFromSerial2();//Data version3: Send recive data from Serial2 to Mesh
+        static long ModbusCurrentMillis = millis();
+        if(millis() -  ModbusCurrentMillis >= 3000) {
+            // Serial.println("Modbus loop: " + String(ModbusCurrentMillis));
+            ModbusCurrentMillis = millis();
         }
-        #endif//USE_MQTT
-        #ifdef USE_Modbus
-            if (MeshConfig.debug){
-                
-                // LOGLN("Registers Value:");
-                // for (int i = 0; i < (int)mainModbusSetting["Value"].length(); i++) {
-                //     if((int)mainModbusSetting["Type"][i] == 0){
-                //         LOG(String((int)mainModbusSetting["Value"][i]) + " [" + String(mainModbusCom.GetCoilReg((int)mainModbusSetting["Value"][i])) + "] | ");
-                //     }
-                //     if((int)mainModbusSetting["Type"][i] == 1){
-                //         LOG(String((int)mainModbusSetting["Value"][i]) + " [" + String(mainModbusCom.GetHoldingReg((int)mainModbusSetting["Value"][i])) + "] | ");
-                //     }
-                //         uint32_t dwordValue = mainModbusCom.DWORD(mainModbusCom.GetHoldingReg((int)mainModbusSetting["Value"][i]), mainModbusCom.GetHoldingReg(((int)mainModbusSetting["Value"][i]) + 1));
-                //         LOG(String((int)mainModbusSetting["Value"][i]) + " [" + String(dwordValue) + "] | ");
-                //     }
-                //     if((int)mainModbusSetting["Type"][i] == 3){
-                //         LOG(String((int)mainModbusSetting["Value"][i]) + " [" + String((float)(mainModbusCom.DWORD(mainModbusCom.GetHoldingReg((int)mainModbusSetting["Value"][i]), mainModbusCom.GetHoldingReg(((int)mainModbusSetting["Value"][i])+ 1)))) + "] | ");
-                //     }
-                // }
-                // LOGLN();
-            }
-            if(MeshConfig.dataVersion == 2){
-                uint8_t dataIndex = 0; // Index to track position in dataPacket.data
-                for (int i = 0; i < (int)mainModbusSetting["Value"].length(); i++) {
-                    if ((int)mainModbusSetting["Type"][i] == 0) {
-                        // Type 0: Coil Register
-                        if (dataIndex < sizeof(packet.data)) {
-                            packet.data[dataIndex++] = mainModbusCom.GetCoilReg((int)mainModbusSetting["Value"][i]);
-                        }
-                    } else if ((int)mainModbusSetting["Type"][i] == 1) {
-                        // Type 1: Holding Register
-                        if (dataIndex + 1 < sizeof(packet.data)) {
-                            uint16_t value = mainModbusCom.GetHoldingReg((int)mainModbusSetting["Value"][i]);
-                            packet.data[dataIndex++] = (value >> 8) & 0xFF; // High byte
-                            packet.data[dataIndex++] = value & 0xFF;        // Low byte
-                        }
-                    } else if ((int)mainModbusSetting["Type"][i] == 2) {
-                        // Type 2: DWORD
-                        if (dataIndex + 3 < sizeof(packet.data)) {
-                            uint32_t dwordValue = mainModbusCom.DWORD(
-                                mainModbusCom.GetHoldingReg((int)mainModbusSetting["Value"][i]),
-                                mainModbusCom.GetHoldingReg(((int)mainModbusSetting["Value"][i]) + 1));
-                            packet.data[dataIndex++] = (dwordValue >> 24) & 0xFF; // High byte
-                            packet.data[dataIndex++] = (dwordValue >> 16) & 0xFF;
-                            packet.data[dataIndex++] = (dwordValue >> 8) & 0xFF;
-                            packet.data[dataIndex++] = dwordValue & 0xFF;        // Low byte
-                        }
-                    } else if ((int)mainModbusSetting["Type"][i] == 3) {
-                        // Type 3: Float
-                        if (dataIndex + 3 < sizeof(packet.data)) {
-                            float floatValue = (float)(mainModbusCom.DWORD(
-                                mainModbusCom.GetHoldingReg((int)mainModbusSetting["Value"][i]),
-                                mainModbusCom.GetHoldingReg(((int)mainModbusSetting["Value"][i]) + 1)));
-                            uint8_t *floatBytes = (uint8_t *)&floatValue;
-                            packet.data[dataIndex++] = floatBytes[0];
-                            packet.data[dataIndex++] = floatBytes[1];
-                            packet.data[dataIndex++] = floatBytes[2];
-                            packet.data[dataIndex++] = floatBytes[3];
-                        }
-                    }
-                }
-                packet.ID = MeshConfig.id;
-                packet.netId = MeshConfig.netId;
-                if(MeshConfig.role == "Node" || MeshConfig.role == "Repeater"){
-                    int result = esp_now_send(MeshConfig.BrokerAddress, (uint8_t *)&packet, sizeof(packet));
-                        if (result == 0)
-                        {
-                            if (MeshConfig.debug) Serial.println("Node message success");
-                        }
-                        else
-                        {
-                            if (MeshConfig.debug) Serial.println("Unknown error");
-                        }
-                    }
-            }//Data version2: Modbus Reg
+        mainLoRa.receiveData();
+    }
+
+    #ifdef USE_Modbus
+        MQTTwifiConfig.loop();
         #endif//USE_Modbus
-    }
-#ifdef ESP32
-    if(configMode){
-        dnsServer.processNextRequest();
-        static long timeCount = 0;
-        if (millis() - timeCount >= 200) {
-            timeCount = millis();
-            digitalWrite(LED_STT, !digitalRead(LED_STT)); // Toggle LED state
+        // mainLoRa.LoRaLoop();
+    if(MeshConfig.role == "Node"){mainLoRa.LoRaLoop(2);
+        if(MeshConfig.dataVersion == 3 || MeshConfig.dataVersion == 0){receiveDataPacketFromSerial2();}//Data version3: Send recive data from Serial2 to Mesh
+       
+        static int randomDelay = 3000;
+        static long ModbusCurrentMillis = millis();
+        if(millis() -  ModbusCurrentMillis >= randomDelay) {
+            randomDelay = random(2500, 3000);
+            ModbusCurrentMillis = millis();
+            #ifdef USE_MQTT
+            // Serial.println("isConnected: " + String(mqttIsConnected));
+            // Serial.println("WiFi status: " + String(WiFi.status()));
+            if(WiFi.status() == WL_CONNECTED && mqttIsConnected == true) {
+                LOGLN("GetTime: ");
+                rtcTimeOnl.Time_loop();rtcTimeOnl.GetTime();
+                LOGLN("GetTime: " + String(Getyear) + "-" + String(Getmonth) + "-" + String(Getday) + " " + String(Gethour) + ":" + String(Getmin) + ":" + String(Getsec));
+                String payloadSent = "";
+                String DataAt = "";
+                String TimeAt = String(Getyear) + "-" + String(Getmonth) + "-" + String(Getday) + " " + String(Gethour) + ":" + String(Getmin) + ":" + String(Getsec);
+                
+                    if((int)mainModbusSetting["Type"][0] == 0){
+                        DataAt = "{\"key\":\""+ String((int)mainModbusSetting["Tag"][0]) + "\",\"value\":" + String(mainModbusCom.GetCoilReg((int)mainModbusSetting["Value"][0])) + "}" ;
+                    }
+                    if((int)mainModbusSetting["Type"][0] == 1){
+                        DataAt = "{\"key\":\""+ String((int)mainModbusSetting["Tag"][0]) + "\",\"value\":" + String(mainModbusCom.GetHoldingReg((int)mainModbusSetting["Value"][0])) + "}" ;
+                    }
+                    if((int)mainModbusSetting["Type"][0] == 2){
+                        uint32_t dwordValue = mainModbusCom.DWORD(
+                            mainModbusCom.GetHoldingReg((int)mainModbusSetting["Value"][0]), 
+                            mainModbusCom.GetHoldingReg(((int)mainModbusSetting["Value"][0]) + 1));
+                        DataAt = "{\"key\":\""+ String((int)mainModbusSetting["Tag"][0]) + "\",\"value\":" + String(dwordValue) + "}" ;
+                    }
+                    if((int)mainModbusSetting["Type"][0] == 3){
+                        DataAt = "{\"key\":\""+ String((int)mainModbusSetting["Tag"][0]) + "\",\"value\":" + String(
+                            (float)(mainModbusCom.DWORD(
+                                mainModbusCom.GetHoldingReg((int)mainModbusSetting["Value"][0]), 
+                                mainModbusCom.GetHoldingReg(((int)mainModbusSetting["Value"][0])+ 1)))
+                            ) + "}" ;
+                    }
+                for (int i = 1; i < (int)mainModbusSetting["Value"].length(); i++) {
+                    if((int)mainModbusSetting["Type"][i] == 0){
+                        DataAt += ",{\"key\":\""+ String((int)mainModbusSetting["Tag"][i]) + "\",\"value\":" + String(
+                            mainModbusCom.GetCoilReg((int)mainModbusSetting["Value"][i])) + "}" ;
+                    }
+                    if((int)mainModbusSetting["Type"][i] == 1){
+                        DataAt += ",{\"key\":\""+ String((int)mainModbusSetting["Tag"][i]) + "\",\"value\":" + String(
+                            mainModbusCom.GetHoldingReg((int)mainModbusSetting["Value"][i])) + "}" ;
+                    }
+                    if((int)mainModbusSetting["Type"][i] == 2){
+                        uint32_t dwordValue = mainModbusCom.DWORD(
+                            mainModbusCom.GetHoldingReg((int)mainModbusSetting["Value"][i]),
+                            mainModbusCom.GetHoldingReg(((int)mainModbusSetting["Value"][i]) + 1));
+                        DataAt += ",{\"key\":\""+ String((int)mainModbusSetting["Tag"][i]) + "\",\"value\":\"" + String(dwordValue) + "}" ;
+                    }
+                    if((int)mainModbusSetting["Type"][i] == 3){
+                        DataAt += ",{\"key\":\""+ String((int)mainModbusSetting["Tag"][i]) + "\",\"value\":\"" + String(
+                            (float)(mainModbusCom.DWORD(
+                                mainModbusCom.GetHoldingReg((int)mainModbusSetting["Value"][i]), 
+                                mainModbusCom.GetHoldingReg(((int)mainModbusSetting["Value"][i])+ 1)))
+                            ) + "}" ;
+                    }
+                }
+                payloadSent = "{\"connId\":\"" + String(conId) + "\",\"data\":[" + DataAt + "],\"exeAt\":\"" + String(TimeAt)+"\"}";
+                MQTTwifiConfig.MQTTPush(mqttTopic, payloadSent);payloadSent = "";
+            }
+            #endif//USE_MQTT
+            #ifdef USE_Modbus
+                if (MeshConfig.debug && MobusInited == true){
+                    
+                    // LOGLN("Registers Value:");
+                    // for (int i = 0; i < (int)mainModbusSetting["Value"].length(); i++) {
+                    //     if((int)mainModbusSetting["Type"][i] == 0){
+                    //         LOG(String((int)mainModbusSetting["Value"][i]) + " [" + String(mainModbusCom.GetCoilReg((int)mainModbusSetting["Value"][i])) + "] | ");
+                    //     }
+                    //     if((int)mainModbusSetting["Type"][i] == 1){
+                    //         LOG(String((int)mainModbusSetting["Value"][i]) + " [" + String(mainModbusCom.GetHoldingReg((int)mainModbusSetting["Value"][i])) + "] | ");
+                    //     }
+                    //     if((int)mainModbusSetting["Type"][i] == 2){
+                    //         uint32_t dwordValue = mainModbusCom.DWORD(mainModbusCom.GetHoldingReg((int)mainModbusSetting["Value"][i]), mainModbusCom.GetHoldingReg(((int)mainModbusSetting["Value"][i]) + 1));
+                    //         LOG(String((int)mainModbusSetting["Value"][i]) + " [" + String(dwordValue) + "] | ");
+                    //     }
+                    //     if((int)mainModbusSetting["Type"][i] == 3){
+                    //         LOG(String((int)mainModbusSetting["Value"][i]) + " [" + String((float)(mainModbusCom.DWORD(mainModbusCom.GetHoldingReg((int)mainModbusSetting["Value"][i]), mainModbusCom.GetHoldingReg(((int)mainModbusSetting["Value"][i])+ 1)))) + "] | ");
+                    //     }
+                    // }
+                    // LOGLN();
+                }
+                if(MeshConfig.dataVersion == 2 && MobusInited == true){
+                    uint8_t dataIndex = 0; // Index to track position in dataPacket.data
+                    for (int i = 0; i < (int)mainModbusSetting["Value"].length(); i++) {
+                        if ((int)mainModbusSetting["Type"][i] == 0) {
+                            // Type 0: Coil Register
+                            if (dataIndex < sizeof(packet.data)) {
+                                packet.data[dataIndex++] = mainModbusCom.GetCoilReg((int)mainModbusSetting["Value"][i]);
+                            }
+                        } else if ((int)mainModbusSetting["Type"][i] == 1) {
+                            // Type 1: Holding Register
+                            if (dataIndex + 1 < sizeof(packet.data)) {
+                                uint16_t value = mainModbusCom.GetHoldingReg((int)mainModbusSetting["Value"][i]);
+                                packet.data[dataIndex++] = (value >> 8) & 0xFF; // High byte
+                                packet.data[dataIndex++] = value & 0xFF;        // Low byte
+                            }
+                        } else if ((int)mainModbusSetting["Type"][i] == 2) {
+                            // Type 2: DWORD
+                            if (dataIndex + 3 < sizeof(packet.data)) {
+                                uint32_t dwordValue = mainModbusCom.DWORD(
+                                    mainModbusCom.GetHoldingReg((int)mainModbusSetting["Value"][i]),
+                                    mainModbusCom.GetHoldingReg(((int)mainModbusSetting["Value"][i]) + 1));
+                                packet.data[dataIndex++] = (dwordValue >> 24) & 0xFF; // High byte
+                                packet.data[dataIndex++] = (dwordValue >> 16) & 0xFF;
+                                packet.data[dataIndex++] = (dwordValue >> 8) & 0xFF;
+                                packet.data[dataIndex++] = dwordValue & 0xFF;        // Low byte
+                            }
+                        } else if ((int)mainModbusSetting["Type"][i] == 3) {
+                            // Type 3: Float
+                            if (dataIndex + 3 < sizeof(packet.data)) {
+                                float floatValue = (float)(mainModbusCom.DWORD(
+                                    mainModbusCom.GetHoldingReg((int)mainModbusSetting["Value"][i]),
+                                    mainModbusCom.GetHoldingReg(((int)mainModbusSetting["Value"][i]) + 1)));
+                                uint8_t *floatBytes = (uint8_t *)&floatValue;
+                                packet.data[dataIndex++] = floatBytes[0];
+                                packet.data[dataIndex++] = floatBytes[1];
+                                packet.data[dataIndex++] = floatBytes[2];
+                                packet.data[dataIndex++] = floatBytes[3];
+                            }
+                        }
+                    }
+                    packet.ID = MeshConfig.id;
+                    packet.netId = MeshConfig.netId;
+                    if(MeshConfig.role == "Node" || MeshConfig.role == "Repeater"){
+                        // int result = esp_now_send(MeshConfig.BrokerAddress, (uint8_t *)&packet, sizeof(packet));
+                        const char *message = "Hello, Mesh!";
+                        int result = esp_now_send(MeshConfig.BrokerAddress, (const uint8_t *)message, strlen(message) + 1);
+
+                            if (result == 0)
+                            {
+                                if (MeshConfig.debug) Serial.println("Node message success");
+                            }
+                            else
+                            {
+                                if (MeshConfig.debug) Serial.println("Unknown error");
+                            }
+                        }
+                }//Data version2: Modbus Reg
+            #endif//USE_Modbus
         }
-    } else {
-        digitalWrite(LED_STT, LOW); // Turn off the LED when not in config mode
-    }
-#else 
-    int result = esp_now_send(MeshConfig.BrokerAddress, (uint8_t *) &packet, sizeof(packet));
-    if (result == 0)
-    {
-        if (MeshConfig.debug) Serial.println("Broker message success");
-    }
-    else
-    {
-        if (MeshConfig.debug) Serial.println("Unknown error");
-    }
+    #ifdef ESP32
+
+    #else 
+        int result = esp_now_send(MeshConfig.BrokerAddress, (uint8_t *) &packet, sizeof(packet));
+        if (result == 0)
+        {
+            if (MeshConfig.debug) Serial.println("Broker message success");
+        }
+        else
+        {
+            if (MeshConfig.debug) Serial.println("Unknown error");
+        }
     
-#endif//ESP32
-    // delay(3000);
+    #endif//ESP32
+    }
 }

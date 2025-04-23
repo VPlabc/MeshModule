@@ -43,17 +43,68 @@
 #include <freertos/queue.h>
 #include <freertos/task.h>
 
+#include "esp_wifi.h"
 
+
+#define Module_RS485
+// #define Module_10O4I
 
 #define CONFIG_FILE "/config.json"
 #define MACLIST_FILE "/maclist.json"
-#define SETUP_BUTTON  26 // GPIO 0
-#define LED_STT  25 // GPIO 2
-#define M0_PIN  5
-#define M1_PIN  27 
+#ifdef Module_RS485
+  #define BUZZ        -1
+  #define SETUP_BUTTON  26 // GPIO 0
+  #define LED_STT  25 // GPIO 2
+#endif// Module RS485
+#ifdef Module_10O4I
+// #include "Adafruit_MCP23008.h"
 
-#define M0_PIN_1  2 
-#define M1_PIN_1  15
+// #define I2C_SDA1 32   // khai bao chan I2C
+// #define I2C_SCL1 33
+
+
+#define Y8  4
+#define Y9  5
+
+#define ledPin1    Y9
+// #define ledPinStt  -1
+// #define ledPinOut  -1
+
+#define BUZZ        12
+#define SETUP_BUTTON   13
+#define BTN_IO0     0
+#define LED_STT  Y8 
+
+// #define DA0         39
+// #define DA1         36
+///////// ADC //////////////////
+#define ADCPin1 36
+#define ADCPin2 39
+
+#define InPut0  BTN_IO0
+#define InPut1  34
+#define InPut2  35
+#define InPut3  15
+#define InPut4  2
+
+
+
+#define ETH_ADDR 1
+#define ETH_POWER_PIN -1 // Do not use it, it can cause conflict during the software reset.
+#define ETH_POWER_PIN_ALTERNATIVE 14
+#define ETH_MDC_PIN 23
+#define ETH_MDIO_PIN 18
+#define ETH_TYPE ETH_PHY_LAN8720
+#define ETH_CLK_MODE ETH_CLOCK_GPIO0_IN
+
+
+
+#endif// Module 10O4I
+// #define M0_PIN  5
+// #define M1_PIN  27 
+
+// #define M0_PIN_1  2 
+// #define M1_PIN_1  15
 
 
 // #define MY_ROLE         ESP_NOW_ROLE_COMBO              // set the role of this device: CONTROLLER, SLAVE, COMBO

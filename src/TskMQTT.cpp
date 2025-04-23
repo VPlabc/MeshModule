@@ -6,167 +6,10 @@ WebinterFace webInterface;
 AsyncMqttClient mqttClient;
 TimerHandle_t mqttReconnectTimer;
 TimerHandle_t wifiReconnectTimer;
+static int reconnectAttempts = 0; // Biến đếm số lần thử kết nối lại
+
 #endif//MQTT_Client
-#ifdef MQTTV1
-WiFiClientSecure net;
-MQTTClient mqttClient;
-void messageReceived(String &topic, String &payload) {
-    Serial.println("incoming: " + topic + " - " + payload);
-  
-    // Note: Do not use the client in the callback to publish, subscribe or
-    // unsubscribe as it may cause deadlocks when other things arrive while
-    // sending and receiving acknowledgments. Instead, change a global variable,
-    // or push to a queue and handle it in the loop after calling `client.loop()`.
-  }
-void setupMQTT() {
-    // net.setInsecure();
 
-    mqttClient.begin(mqttHost.c_str(), mqttPort, net);
-    if (!mqttClient.connected()) {
-        if (mqttClient.connect(conId.c_str(), mqttUser.c_str(), mqttPass.c_str())) {
-            Serial.println("MQTT connected.");
-            mqttClient.onMessage(messageReceived);
-            mqttClient.subscribe(mqttTopicSub.c_str());
-        } else {
-            Serial.println("MQTT connection failed.");
-        }
-    }
-}
-static int counter = 0;
-void WifiMqttConfig::setupWiFi() {
-    static int reconnectAttempts = 0; // Biến đếm số lần thử kết nối lại
-
-    if (wifiMode == "STA") {
-        WiFi.mode(WIFI_STA);
-        WiFi.begin(ssid.c_str(), pass.c_str());
-        Serial.print("Connecting to WiFi");
-        while (WiFi.status() != WL_CONNECTED) {
-            static int counter = 0;
-            if (counter++ < 20) {
-                Serial.print(".");
-                delay(500); // Thêm delay để tránh vòng lặp quá nhanh
-            } else {
-                Serial.println("Connect to WiFi fail.");
-                reconnectAttempts++;
-                break;
-            }
-        }
-
-        if (WiFi.status() == WL_CONNECTED) {
-            Serial.println("WiFi connected.");
-            Serial.print("IP address: ");
-            Serial.println(WiFi.localIP());
-            reconnectAttempts = 0; // Reset số lần thử khi kết nối thành công
-            webInterface.setupWebConfig();
-        } else if (reconnectAttempts >= 3) {
-            Serial.println("Failed to connect to WiFi after 3 attempts. Switching to AP mode.");
-            // Cập nhật cấu hình sang chế độ AP
-            wifiMode = "AP";
-            DynamicJsonDocument doc(1024);
-            doc["mqttEnable"] = mqttEnable;
-            doc["mqttHost"] = mqttHost;
-            doc["mqttPort"] = mqttPort;
-            doc["mqttUser"] = mqttUser;
-            doc["mqttPass"] = mqttPass;
-            doc["wifiMode"] = wifiMode; // Lưu chế độ WiFi (STA hoặc AP)
-            doc["ssid"] = ssid;
-            doc["pass"] = pass;
-            doc["conId"] = conId;
-            doc["mqttTopic"] = mqttTopic;
-            doc["mqttTopicSub"] = mqttTopicSub;
-        
-            File configFile = LittleFS.open(WIFIMQTT_FILE, "w");
-            if (!configFile) {
-                Serial.println("Failed to open config file for writing.");
-                return;
-            }
-            serializeJson(doc, configFile);
-            configFile.close();
-            
-        }
-    }else {
-        mqttEnable = false;
-    }
-}
-void WifiMqttConfig::setup() {
-
-    if (!LittleFS.begin()) {
-        Serial.println("Failed to initialize LittleFS");
-        return;
-    }
-
-    // Tải cấu hình từ file
-    if (LittleFS.exists(WIFIMQTT_FILE)) {
-        File configFile = LittleFS.open(WIFIMQTT_FILE, "r");
-        if (configFile) {
-            DynamicJsonDocument doc(1024);
-            deserializeJson(doc, configFile);
-            configFile.close();
-
-            mqttEnable = doc["mqttEnable"] | true;
-            mqttHost = doc["mqttHost"] | "broker.hivemq.com";
-            mqttPort = doc["mqttPort"] | 1883;
-            mqttUser = doc["mqttUser"] | "username";
-            mqttPass = doc["mqttPass"] | "password";
-            wifiMode = doc["wifiMode"] | "STA";
-            ssid = doc["ssid"] | "I-Soft";
-            pass = doc["pass"] | "i-soft@2023";
-            conId = doc["conId"] | "b8e54d33-b34a-45ab-b76f-62c8a9abc6c4";
-            mqttTopic = doc["mqttTopic"] | "test/topic";
-            mqttTopicSub = doc["mqttTopicSub"] | "test/topic/sub";
-        }
-    }
-    if(mqttEnable){
-        Serial.println("SSID: " + ssid);
-        Serial.println("Password: " + pass);
-        Serial.println("WiFi Mode: " + wifiMode);
-        Serial.println("MQTT enabled.");
-        Serial.print("MQTT Host: ");
-        Serial.println(mqttHost);
-        Serial.print("MQTT Port: ");
-        Serial.println(mqttPort);
-        Serial.print("MQTT User: ");
-        Serial.println(mqttUser);
-        Serial.print("MQTT Password: ");
-        Serial.println(mqttPass);
-        Serial.println("ConId: " + conId);
-        Serial.print("MQTT Topic: ");
-        Serial.println(mqttTopic);
-        Serial.print("MQTT Topic Sub: ");
-        Serial.println(mqttTopicSub);
-    
-        setupWiFi();
-        if (mqttEnable) {
-            setupMQTT();
-        }
-    }
-
-    // server.begin();
-    // Serial.println("Web server started.");
-}
-
-void WifiMqttConfig::loop() {
-    if (mqttEnable) {
-        static long lastTimeConnect = 0;
-        if (millis() - lastTimeConnect > 10000) {
-            lastTimeConnect = millis();
-            Serial.println("MQTT loop.");
-            if(WiFi.status() != WL_CONNECTED) {
-                Serial.println("WiFi not connected, trying to reconnect...");
-                setupWiFi();
-                }
-                else{
-                    mqttClient.loop();
-                    if (!mqttClient.connected()) {
-                        setupMQTT();
-                    }
-                }
-            }
-    }
-    
-    // server.handleClient();
-}
-#endif// MQTT_V1
 
 bool mqttIsConnected = false;
 
@@ -245,47 +88,16 @@ String WifiMqttConfig::loadWifiMqttConfig(bool debug, fs::FS &FileSystem) {
 #ifdef MQTT_Client
 
 void WifiMqttConfig::MQTTPush(String Topic,String Payload) {
-    if(WiFi.status() == WL_CONNECTED && mqttIsConnected)mqttClient.publish(Topic.c_str(), 0, true ,Payload.c_str());
+    Serial.println("MQTT Push: " + Topic + " - " + Payload);
+    mqttClient.publish(Topic.c_str(), 0, true ,Payload.c_str());
 }
-static int reconnectAttempts = 0; // Biến đếm số lần thử kết nối lại
 void connectToWifi() {
+    Serial.println("SSID: " + ssid);
+    Serial.println("Password: " + pass);
     Serial.println("Connecting to Wi-Fi...");
-    WiFi.begin(ssid.c_str(), pass.c_str()); 
-    while(WiFi.status() != WL_CONNECTED) {
-        Serial.print(".");
-        delay(500); // Thêm delay để tránh vòng lặp quá nhanh
-        if (reconnectAttempts++ > 20) {
-            Serial.println("Connect to WiFi fail.");
-            break;
-        }
-    }
-    if (reconnectAttempts >= 3) {
-        Serial.println("Failed to connect to Wi-Fi after 3 attempts. Switching to AP mode.");
-        // Cập nhật cấu hình sang chế độ AP
-        wifiMode = "AP";
-        DynamicJsonDocument doc(1024);
-        doc["mqttEnable"] = mqttEnable;
-        doc["mqttHost"] = mqttHost;
-        doc["mqttPort"] = mqttPort;
-        doc["mqttUser"] = mqttUser;
-        doc["mqttPass"] = mqttPass;
-        doc["wifiMode"] = wifiMode; // Lưu chế độ WiFi (STA hoặc AP)
-        doc["ssid"] = ssid;
-        doc["pass"] = pass;
-        doc["conId"] = conId;
-        doc["mqttTopic"] = mqttTopic;
-        doc["mqttTopicSub"] = mqttTopicSub;
-    
-        File configFile = LittleFS.open(WIFIMQTT_FILE, "w");
-        if (!configFile) {
-            Serial.println("Failed to open config file for writing.");
-            return;
-        }
-        serializeJson(doc, configFile);
-        configFile.close();
-        delay(1000);
-        ESP.restart();
-    }
+    WiFi.begin(ssid.c_str(), pass.c_str());
+    Serial.println("Connecting to WiFi");
+    reconnectAttempts++;
   }
   
   void connectToMqtt() {
@@ -397,29 +209,42 @@ void connectToWifi() {
             ssid = doc["ssid"] | "I-Soft";
             pass = doc["pass"] | "i-soft@2023";
             conId = doc["conId"] | "b8e54d33-b34a-45ab-b76f-62c8a9abc6c4";
-            mqttTopic = doc["mqttTopic"] | "test/topic";
-            mqttTopicSub = doc["mqttTopicSub"] | "test/topic/sub";
+            mqttTopic = doc["mqttTopic"] | "iSoftMesh/data";
+            mqttTopicSub = doc["mqttTopicSub"] | "iSoftMesh/sub";
+        }
+        else{
+            Serial.println("Failed to open wifi_mqtt.json for reading.");
+            return;
+        }
+    }else{
+        Serial.println("wifi_mqtt.json not found. Creating default configuration.");
+        // Tạo cấu hình mặc định nếu file không tồn tại
+        DynamicJsonDocument doc(1024);
+        doc["mqttEnable"] = true;
+        doc["mqttHost"] = "vm01.i-soft.com.vn";
+        doc["mqttPort"] = 11883;
+        doc["mqttUser"] = "mqtt-user-01";
+        doc["mqttPass"] = "MtTP5WBlYy3CSaRL9c_s4VFQ";
+        doc["wifiMode"] = "AP";
+        doc["ssid"] = "I-Soft";
+        doc["pass"] = "i-soft@2023";
+        doc["conId"] = "b8e54d33-b34a-45ab-b76f-62c8a9abc6c4";
+        doc["mqttTopic"] = "iSoftMesh/data";
+        doc["mqttTopicSub"] = "iSoftMesh/sub";
+
+        // Lưu cấu hình mặc định vào file
+        File configFile = LittleFS.open(WIFIMQTT_FILE, "w");
+        if (configFile) {
+            serializeJson(doc, configFile);
+            configFile.close();
+            Serial.println("Default configuration created.");
+            ESP.restart();
+        } else {
+            Serial.println("Failed to create default config file.");
+            return;
         }
     }
-    if(wifiMode == "STA" && mqttEnable){
-        Serial.println("MQTT enabled.");
-        Serial.print("MQTT Host: ");
-        Serial.println(mqttHost);
-        Serial.print("MQTT Port: ");
-        Serial.println(mqttPort);
-        Serial.print("MQTT User: ");
-        Serial.println(mqttUser);
-        Serial.print("MQTT Password: ");
-        Serial.println(mqttPass);
-        Serial.println("ConId: " + conId);
-        Serial.print("MQTT Topic: ");
-        Serial.println(mqttTopic);
-        Serial.print("MQTT Topic Sub: ");
-        Serial.println(mqttTopicSub);
-        Serial.println("SSID: " + ssid);
-        Serial.println("Password: " + pass);
-        Serial.println("WiFi Mode: " + wifiMode);
-        
+    if(wifiMode == "STA" && mqttEnable && WiFi.status() == WL_CONNECTED){        
         mqttReconnectTimer = xTimerCreate("mqttTimer", pdMS_TO_TICKS(2000), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToMqtt));
     }
     if(wifiMode == "STA"){
@@ -438,9 +263,52 @@ void connectToWifi() {
         mqttClient.setCredentials(mqttUser.c_str(), mqttPass.c_str());
         connectToWifi();
     }
+    Serial.println("MQTT enabled.");
+    Serial.print("MQTT Host: ");
+    Serial.println(mqttHost);
+    Serial.print("MQTT Port: ");
+    Serial.println(mqttPort);
+    Serial.print("MQTT User: ");
+    Serial.println(mqttUser);
+    Serial.print("MQTT Password: ");
+    Serial.println(mqttPass);
+    Serial.println("ConId: " + conId);
+    Serial.print("MQTT Topic: ");
+    Serial.println(mqttTopic);
+    Serial.print("MQTT Topic Sub: ");
+    Serial.println(mqttTopicSub);
+    Serial.println("SSID: " + ssid);
+    Serial.println("Password: " + pass);
+    Serial.println("WiFi Mode: " + wifiMode);
   }
 
   void WifiMqttConfig::loop(){
-
+    if (reconnectAttempts >= 3) {reconnectAttempts = 0;
+        Serial.println("Failed to connect to Wi-Fi after 3 attempts. Switching to AP mode.");
+        // Cập nhật cấu hình sang chế độ AP
+        wifiMode = "AP";
+        DynamicJsonDocument doc(1024);
+        doc["mqttEnable"] = mqttEnable;
+        doc["mqttHost"] = mqttHost;
+        doc["mqttPort"] = mqttPort;
+        doc["mqttUser"] = mqttUser;
+        doc["mqttPass"] = mqttPass;
+        doc["wifiMode"] = wifiMode; // Lưu chế độ WiFi (STA hoặc AP)
+        doc["ssid"] = ssid;
+        doc["pass"] = pass;
+        doc["conId"] = conId;
+        doc["mqttTopic"] = mqttTopic;
+        doc["mqttTopicSub"] = mqttTopicSub;
+    
+        File configFile = LittleFS.open(WIFIMQTT_FILE, "w");
+        if (!configFile) {
+            Serial.println("Failed to open config file for writing.");
+            return;
+        }
+        serializeJson(doc, configFile);
+        configFile.close();
+        // delay(3000);
+        ESP.restart();
+    }
   }
   #endif//MQTT_Client

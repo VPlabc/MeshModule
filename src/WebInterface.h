@@ -5,6 +5,7 @@
 // #include <ArduinoJson.h>
 #include "main.h"
 // #include "TskMQTT.h"
+extern String wifiMode;
 
 #define WIFIMQTT_FILE "/wifi_mqtt.json"
 #define CONFIG_FILE "/config.json"

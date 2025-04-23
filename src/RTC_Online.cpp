@@ -25,6 +25,7 @@ void RTCTimeOnline::RTCGetTime(){
     dtime = rtctime.GetRTC();
     #else
     LOGLN("RTC_DS3231 not defined");
+    return;
     #endif//RTC_DS3231
     Getyear = dtime.year;
     Getmonth = dtime.mon;
@@ -87,45 +88,48 @@ void  RTCTimeOnline::SetTimeForRTC(){
 }
 void RTCTimeOnline::Time_setup() {
   // Initialize Serial Monitor
-
-// Initialize a NTPClient to get time
-  timeClient.begin();
-  // Set offset time in seconds to adjust for your timezone, for example:
-  // GMT +1 = 3600
-  // GMT +8 = 28800
-  // GMT -1 = -3600
-  // GMT 0 = 0
-  timeClient.setTimeOffset(+7);
+  if(WiFi.status() == WL_CONNECTED){
+  // Initialize a NTPClient to get time
+    timeClient.begin();
+    // Set offset time in seconds to adjust for your timezone, for example:
+    // GMT +1 = 3600
+    // GMT +8 = 28800
+    // GMT -1 = -3600
+    // GMT 0 = 0
+    timeClient.setTimeOffset(+7);
+  }
 }
 bool TimeOnce = 1;
 bool TimeDSOnce = 1;
 void RTCTimeOnline::Time_loop() {
-  if(!timeClient.update() && WiFi.status() == WL_CONNECTED) {
-    timeClient.forceUpdate();
-  }else{
-  // The formattedDate comes with the following format:
-  // 2018-05-28T16:00:13Z
-  // We need to extract date and time
-  formattedDate = timeClient.getFormattedDate();
-  // if(TimeOnce){Serial.println(formattedDate);}
+ if(WiFi.status() == WL_CONNECTED){
+    if(!timeClient.update()) {
+      timeClient.forceUpdate();
+    }else{
+    // The formattedDate comes with the following format:
+    // 2018-05-28T16:00:13Z
+    // We need to extract date and time
+    formattedDate = timeClient.getFormattedDate();
+    // if(TimeOnce){Serial.println(formattedDate);}
 
-  // Extract date
-  int splitT = formattedDate.indexOf("T");
-  if(Getyear != 1900 && Getyear != 1970){
-    dayStamp = formattedDate.substring(0, splitT);
-    timeStamp = formattedDate.substring(splitT+1, formattedDate.length()-1);
-    if(TimeOnce){
-    Serial.print("DATE: ");
-    Serial.println(dayStamp);}
-    // Date = dayStamp;
-    // Extract time
-    if(TimeOnce){
-    Serial.print("TIME: ");
-    Serial.println(timeStamp);TimeOnce = false;}
-    // Time = timeStamp;
-    GetEpoch = timeClient.getEpochTime();
+    // Extract date
+    int splitT = formattedDate.indexOf("T");
+    if(Getyear != 1900 && Getyear != 1970){
+      dayStamp = formattedDate.substring(0, splitT);
+      timeStamp = formattedDate.substring(splitT+1, formattedDate.length()-1);
+      if(TimeOnce){
+      Serial.print("DATE: ");
+      Serial.println(dayStamp);}
+      // Date = dayStamp;
+      // Extract time
+      if(TimeOnce){
+      Serial.print("TIME: ");
+      Serial.println(timeStamp);TimeOnce = false;}
+      // Time = timeStamp;
+      GetEpoch = timeClient.getEpochTime();
+      }
+      // dayStamp.clear();timeStamp.clear();
     }
-    // dayStamp.clear();timeStamp.clear();
-  }
-//   delay(1000);
+  //   delay(1000);
+ }
 }

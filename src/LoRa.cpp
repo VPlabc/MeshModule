@@ -147,10 +147,14 @@ void updateBaudRate(String uartSpeed) {
 // #include "config.h"
 // // #include "WIC.h"
 // #ifdef USE_LORA
-#include "LookLine.h"
+// #include "LookLine.h"
 // #ifdef USE_LORA
+#define E32_TTL_1W
+
     #include "LoRa_E32.h"
 // #endif//USE_LORA
+
+
   uint8_t M0_ = 0;
   uint8_t M1_ = 0;
   uint8_t TX_ = 0;
@@ -159,17 +163,17 @@ void updateBaudRate(String uartSpeed) {
   String Air_Rate = "";
   String Baud_Rate = "";
   String Lora_PWR = "";
-void SetPinLoRa(uint8_t M0, uint8_t M1, uint8_t TX = 17, uint8_t RX = 16)
+void LoRaFunction::SetPinLoRa(uint8_t M0Pin, uint8_t M1Pin, uint8_t TX, uint8_t RX)
 {
-	M0_ = M0;
-	M1_ = M1;
+	M0_ = M0Pin;
+	M1_ = M1Pin;
 	TX_ = TX;
 	RX_ = RX;
 	LOGLN("LORA Pin M0:" + String(M0_) + "| M1:" + String(M1_) + "| TX:" + String(TX_) + "| RX:" + String(RX_));
 }
 void WriteLoRaConfig(byte CH);
 void WriteLoRaConfig(byte CH,byte AirRate );
-void SetChanel(byte CH){
+void LoRaFunction::SetChanel(byte CH){
 	WriteLoRaConfig(CH);
 }
 // LoRa_E32 e32ttl100(16, 17, &Serial2, UART_BPS_RATE_9600, SERIAL_8N1); // e32 TX e32 RX
@@ -177,7 +181,7 @@ LoRa_E32 e32ttl100(&Serial2, -1, M0_, M1_, UART_BPS_RATE_9600);
 
 void printParameters(struct Configuration configuration);
 
-void ReadLoRaConfig()
+void LoRaFunction::ReadLoRaConfig()
 {
     
   digitalWrite(M0_, HIGH);
@@ -197,7 +201,7 @@ void ReadLoRaConfig()
     digitalWrite(M0_, LOW);
     digitalWrite(M1_, LOW);
 }
-void WriteLoRaConfig(byte CH,byte AirRate )
+void LoRaFunction::WriteLoRaConfig(byte CH,byte AirRate )
 {
     digitalWrite(M0_, HIGH);
     digitalWrite(M1_, HIGH);
@@ -219,7 +223,7 @@ void WriteLoRaConfig(byte CH,byte AirRate )
 	configuration.OPTION.ioDriveMode = IO_D_MODE_PUSH_PULLS_PULL_UPS;
 	configuration.OPTION.wirelessWakeupTime = WAKE_UP_250;
 	configuration.OPTION.fec = FEC_0_OFF;
-	configuration.OPTION.transmissionPower = POWER_20;
+	configuration.OPTION.transmissionPower = POWER_30;
 
 
 	// Set configuration changed and set to not hold the configuration
@@ -231,7 +235,7 @@ void WriteLoRaConfig(byte CH,byte AirRate )
     digitalWrite(M0_, LOW);
     digitalWrite(M1_, LOW);
 }
-void WriteLoRaConfig(byte CH)
+void LoRaFunction::WriteLoRaConfig(byte CH)
 {
     digitalWrite(M0_, HIGH);
     digitalWrite(M1_, HIGH);
@@ -253,7 +257,7 @@ void WriteLoRaConfig(byte CH)
 	configuration.OPTION.fec = FEC_0_OFF;
 	configuration.OPTION.fixedTransmission = FT_TRANSPARENT_TRANSMISSION;
 	configuration.OPTION.ioDriveMode = IO_D_MODE_PUSH_PULLS_PULL_UPS;
-	configuration.OPTION.transmissionPower = POWER_20;
+	configuration.OPTION.transmissionPower = POWER_30;
 	configuration.OPTION.wirelessWakeupTime = WAKE_UP_1250;
 
 	configuration.SPED.airDataRate = AIR_DATA_RATE_001_12;
@@ -272,7 +276,7 @@ void WriteLoRaConfig(byte CH)
     digitalWrite(M0_, LOW);
     digitalWrite(M1_, LOW);
 }
-void printParameters(struct Configuration configuration) {
+void LoRaFunction::printParameters(struct Configuration configuration) {
 	// if(GatewayTerminal){
   	// LOGLN("----------------------------------------");
 
@@ -303,6 +307,132 @@ void printParameters(struct Configuration configuration) {
   LOG("| LoRa Air rate:" + Air_Rate);
   LOG("| LoRa baudrate:" + Baud_Rate);
   LOGLN("| LoRa Power:" + Lora_PWR);
+}
+
+HardwareSerial loraSerial(2); // Serial2 cho LoRa
+#ifdef Module_RS485
+#define LoRaTx  2
+#define LoRaRx  15
+#endif//Module_RS485
+#ifdef Module_10O4I
+#define LoRaTx  32
+#define LoRaRx  33
+#endif//Module_10O4I
+// Khai báo hàm
+void sendCommand(const String &cmd);
+void sendData(String address, String data);
+String hexToAscii(const String &hex);
+void receiveData();
+
+void LoRaFunction::LoRaSetup(int LoRaID) {
+  loraSerial.begin(9600, SERIAL_8N1, LoRaRx , LoRaTx); // RX, TX
+  delay(1000);
+
+  // Cấu hình module
+  sendCommand("AT"); // Kiểm tra kết nối
+  sendCommand("AT+BAND=868500000,M"); // Đặt tần số 868MHz
+  sendCommand("AT+NETWORKID=18");    // Đặt Network ID
+  sendCommand("AT+ADDRESS="+String(LoRaID));    // Địa chỉ của thiết bị này
+  // sendCommand("AT+KEY=AAAAAAAAAAAAAAAA"); // Khóa mã hóa 16 ký tự
+}
+
+void LoRaFunction::LoRaLoop(int SlaveID) {
+  // Gửi dữ liệu mỗi 5 giây
+  static unsigned long lastSend = 0;
+  if (millis() - lastSend >= 3000) {
+    sendData(String(SlaveID), "Hello LoRa!"); // Gửi "Hello LoRa!" đến địa chỉ 456
+    lastSend = millis();
+  }
+
+  // Đọc dữ liệu đến
+  receiveData();
+}
+
+// Hàm gửi lệnh AT và đọc phản hồi
+void sendCommand(const String &cmd) {
+  loraSerial.println(cmd);
+  Serial.print("Sent: ");
+  Serial.println(cmd);
+  delay(100);
+  while (loraSerial.available()) {
+    String response = loraSerial.readStringUntil('\n');
+    Serial.print("Response: ");
+    Serial.println(response);
+  }
+}
+
+// Hàm gửi dữ liệu dạng hex
+void sendData(String address, String data) {
+  String hexData;
+  for (int i = 0; i < data.length(); i++) {
+    char hex[3];
+    sprintf(hex, "%02X", data[i]);
+    hexData += hex;
+  }
+  
+  String cmd = "AT+SEND=" + address + "," + String(data.length()) + "," + data;//hexData;
+  loraSerial.println(cmd);
+  Serial.print("Sent: ");
+  Serial.println(cmd);
+}
+bool LRonce = false;
+// Hàm đọc và xử lý dữ liệu nhận được
+void LoRaFunction::receiveData() {
+  if(!LRonce) {
+    LRonce = true;
+    // delay(1000);
+  loraSerial.begin(9600, SERIAL_8N1, LoRaRx , LoRaTx); // RX, TX
+  // delay(1000);
+  sendCommand("AT"); // Kiểm tra kết nối
+  }
+  while (loraSerial.available()) {
+    String response = loraSerial.readStringUntil('\n');
+    Serial.print("Response: ");
+    Serial.println(response);
+  // }
+    LOGLN(response);
+    response.trim();
+    digitalWrite(BUZZ, HIGH);delay(100);digitalWrite(BUZZ, LOW);
+    if (response.startsWith("+RCV")) {
+      // Phân tích dữ liệu
+      int firstComma = response.indexOf(',', 5);
+      int secondComma = response.indexOf(',', firstComma + 1);
+      int thirdComma = response.indexOf(',', secondComma + 1);
+      int fourthComma = response.indexOf(',', thirdComma + 1);
+
+      if (firstComma == -1 || secondComma == -1 || thirdComma == -1) return;
+
+      String addrStr = response.substring(5, firstComma);
+      String lenStr = response.substring(firstComma + 1, secondComma);
+      String hexData = response.substring(secondComma + 1, thirdComma);
+      String rssi = response.substring(thirdComma + 1, fourthComma);
+      String snr = response.substring(fourthComma + 1);
+
+      // Chuyển hex sang ASCII
+      // String asciiData = hexToAscii(hexData);
+
+      Serial.println("-----------------------------------");
+      Serial.print("Nhận từ địa chỉ: ");
+      Serial.println(addrStr);
+      Serial.print("Dữ liệu: ");
+      Serial.println(hexData);
+      Serial.print("RSSI: ");
+      Serial.println(rssi);
+      Serial.print("SNR: ");
+      Serial.println(snr);
+    }
+  }
+}
+
+// Hàm chuyển đổi hex sang ASCII
+String hexToAscii(const String &hex) {
+  String ascii;
+  for (int i = 0; i < hex.length(); i += 2) {
+    String byteStr = hex.substring(i, i + 2);
+    char c = (char) strtol(byteStr.c_str(), NULL, 16);
+    ascii += c;
+  }
+  return ascii;
 }
 // #endif //USE_LORA
 // #endif//LORA_
