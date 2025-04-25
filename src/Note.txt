@@ -70,7 +70,7 @@ Set module to Config mode
 
 {"BrokerAddress": "94:54:C5:43:75:18", "wifiChannel": 1,"id": 1,"netId": 1,"macSlaves": ["AA:BB:CC:DD:EE:FF", "11:22:33:44:55:66"]}
 
-{"BrokerAddress": "FF:FF:FF:FF:FF:FF", "wifiChannel": 1,"debug":1,"id": 42,"netId": 101,"role":"Node","dataVersion":0,"macSlaves": ["AA:BB:CC:DD:EE:FF", "11:22:33:44:55:66"]}
+{"BrokerAddress": "FF:FF:FF:FF:FF:FF", "wifiChannel": 1,"debug":1,"id": 43,"netId": 101,"role":"Node","dataVersion":0,"macSlaves": ["AA:BB:CC:DD:EE:FF", "11:22:33:44:55:66"]}
 
 {"cmd":"PrintMac"}
 

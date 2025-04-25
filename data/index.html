@@ -82,9 +82,48 @@
         <div class="tab" onclick="showTab('wifiConfig')">WiFi Configuration</div>
         <div class="tab" onclick="showTab('mqttConfig')">MQTT Configuration</div>
         <div class="tab" onclick="showTab('loraConfig')">LoRa E32 Configuration</div>
+        <div class="tab" onclick="showTab('loraRYConfig')">LoRa RY Configuration</div>
         <div class="tab" onclick="showTab('fileManager')">File Manager</div>
     </div>
 <CENTER>
+    <div id="loraRYConfig" class="tab-content">
+        <h2>LoRa RY Module Configuration</h2>
+        <form id="loraRYConfigForm">
+            <div style="margin-bottom: 10px;">
+                <label for="ryMode" style="display: inline-block; width: 150px;">Mode:</label>
+                <select id="ryMode" name="ryMode" style="width: 200px;">
+                    <option value="0">Transceiver Mode</option>
+                    <option value="1">Sleep Mode</option>
+                    <option value="2">Smart Power Saving Mode</option>
+                </select>
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="ryRxTime" style="display: inline-block; width: 150px;">RX Time (ms):</label>
+                <input type="number" id="ryRxTime" name="ryRxTime" placeholder="Enter RX Time" style="width: 200px;" min="30" max="60000">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="ryLowSpeedTime" style="display: inline-block; width: 150px;">Low Speed Time (ms):</label>
+                <input type="number" id="ryLowSpeedTime" name="ryLowSpeedTime" placeholder="Enter Low Speed Time" style="width: 200px;" min="30" max="60000">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="ryBand" style="display: inline-block; width: 150px;">Frequency Band:</label>
+                <input type="number" id="ryBand" name="ryBand" placeholder="Enter Frequency (Hz)" style="width: 200px;" min="490000000" max="915000000">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="ryPower" style="display: inline-block; width: 150px;">Power Level:</label>
+                <input type="number" id="ryPower" name="ryPower" placeholder="Enter Power (dBm)" style="width: 200px;" min="0" max="22">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="ryAddress" style="display: inline-block; width: 150px;">Address:</label>
+                <input type="number" id="ryAddress" name="ryAddress" placeholder="Enter Address" style="width: 200px;" min="0" max="65535">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="ryNetworkId" style="display: inline-block; width: 150px;">Network ID:</label>
+                <input type="number" id="ryNetworkId" name="ryNetworkId" placeholder="Enter Network ID" style="width: 200px;" min="3" max="18">
+            </div>
+            <button type="button" onclick="submitLoRaRYConfig()">Submit</button>
+        </form>
+    </div>
     <div id="loraConfig" class="tab-content">
         <h2>LoRa E32 Configuration</h2>
         <form id="loraConfigForm">
@@ -148,6 +187,51 @@
     </div>
 
     <script>
+         // Load LoRa RY Configuration
+        function loadLoRaRYConfig() {
+            fetch('/load-lora-config')
+                // .then(response => response.json())
+                // .then(data => {
+                //     document.getElementById('ryMode').value = data.mode || '0';
+                //     document.getElementById('ryRxTime').value = data.rxTime || '';
+                //     document.getElementById('ryLowSpeedTime').value = data.lowSpeedTime || '';
+                //     document.getElementById('ryBand').value = data.band || '';
+                //     document.getElementById('ryPower').value = data.power || '';
+                //     document.getElementById('ryAddress').value = data.address || '';
+                //     document.getElementById('ryNetworkId').value = data.networkId || '';
+                // })
+                // .catch(error => console.error('Error loading LoRa RY config:', error));
+        }
+
+        // Submit LoRa RY Configuration
+        function submitLoRaRYConfig() {
+            const form = document.getElementById('loraRYConfigForm');
+            const loraRYConfig = {
+                mode: parseInt(form.ryMode.value),
+                rxTime: parseInt(form.ryRxTime.value),
+                lowSpeedTime: parseInt(form.ryLowSpeedTime.value),
+                band: parseInt(form.ryBand.value),
+                power: parseInt(form.ryPower.value),
+                address: parseInt(form.ryAddress.value),
+                networkId: parseInt(form.ryNetworkId.value)
+            };
+
+            console.log('Submitting LoRa RY config:', loraRYConfig);
+
+            fetch('/configure-lora', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(loraRYConfig)
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Response from server:', data);
+                alert(data.status || 'LoRa RY configuration saved successfully!');
+            })
+            .catch(error => console.error('Error submitting LoRa RY config:', error));
+        }
         function submitLoRaConfig() {
             const form = document.getElementById('loraConfigForm');
             const loraConfig = {
@@ -181,6 +265,15 @@
     <div id="meshConfig" class="tab-content">
         <h2>Mesh Network Configuration</h2>
         <form id="meshConfigForm">
+            <div style="margin-bottom: 10px;">
+                <label for="boardModel" style="display: inline-block; width: 150px;">Board Model:</label>
+                <select id="boardModel" name="boardModel" style="width: 200px;">
+                    <option value="0">Board ModRTUMesh</option>
+                    <option value="1">Board 410WER</option>
+                    <option value="2">Board LklineGw</option>
+                    <option value="3">Board LklineNode</option>
+                </select>
+            </div>
             <div style="margin-bottom: 10px;">
                 <label for="brokerAddress" style="display: inline-block; width: 150px;">Broker MAC Address:</label>
                 <input type="text" id="brokerAddress" name="brokerAddress" placeholder="FF:FF:FF:FF:FF:FF" style="width: 200px;">
@@ -521,51 +614,53 @@
             .then(data => updateFormFromESP(data))
             .catch(error => console.error('Error fetching configuration from ESP:', error));
         // Submit Mesh Network Configuration
-        function submitMeshConfig() {
-            const meshConfig = {
-                type: "ConfigPacket",
-                mac: "FF:FF:FF:FF:FF:FF", // Thay bằng giá trị MAC thực tế nếu cần
-                node_id: parseInt(document.getElementById('meshNodeId').value) || 1,
-                chan: parseInt(document.getElementById('meshChannel').value) || 1,
-                regBit: parseInt(document.getElementById('meshRegBit').value) || 170,
-                reg8: parseInt(document.getElementById('meshReg8').value) || 255,
-                reg16: parseInt(document.getElementById('meshReg16').value) || 65535,
-                role: document.getElementById('meshRole').value || "Broker",
-                ssid: document.getElementById('meshSSID').value || "I-Soft",
-                password: document.getElementById('meshPassword').value || "i-soft@2023",
-                macAddresses: document.getElementById('meshMacAddresses').value.split(',').map(mac => mac.trim()) || [],
-                model: document.getElementById('meshModel').value || "V15",
-                netId: document.getElementById('meshNetId').value || "101"
-            };
+        // function submitMeshConfig() {
+        //     const meshConfig = {
+        //         type: "ConfigPacket",
+        //         mac: "FF:FF:FF:FF:FF:FF", // Thay bằng giá trị MAC thực tế nếu cần
+        //         node_id: parseInt(document.getElementById('meshNodeId').value) || 1,
+        //         chan: parseInt(document.getElementById('meshChannel').value) || 1,
+        //         regBit: parseInt(document.getElementById('meshRegBit').value) || 170,
+        //         reg8: parseInt(document.getElementById('meshReg8').value) || 255,
+        //         reg16: parseInt(document.getElementById('meshReg16').value) || 65535,
+        //         role: document.getElementById('meshRole').value || "Broker",
+        //         ssid: document.getElementById('meshSSID').value || "I-Soft",
+        //         password: document.getElementById('meshPassword').value || "i-soft@2023",
+        //         macAddresses: document.getElementById('meshMacAddresses').value.split(',').map(mac => mac.trim()) || [],
+        //         model: document.getElementById('meshModel').value || "V15",
+        //         netId: document.getElementById('meshNetId').value || "101",
+        //         boardModel: document.getElementById('boardModel').value || "0"
+        //     };
 
-            console.log('Submitting Mesh Network config:', meshConfig);
+        //     console.log('Submitting Mesh Network config:', meshConfig);
 
-            fetch('/save-mesh-config/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(meshConfig),
-            })
-                .then(response => response.json())
-                .then(data => {
-                    console.log('Response from server:', data);
-                    alert(data.status || 'Mesh Network configuration saved successfully!');
-                })
-                .catch(error => console.error('Error submitting Mesh Network config:', error));
-        }
+        //     fetch('/save-mesh-config/', {
+        //         method: 'POST',
+        //         headers: {
+        //             'Content-Type': 'application/json',
+        //         },
+        //         body: JSON.stringify(meshConfig),
+        //     })
+        //         .then(response => response.json())
+        //         .then(data => {
+        //             console.log('Response from server:', data);
+        //             alert(data.status || 'Mesh Network configuration saved successfully!');
+        //         })
+        //         .catch(error => console.error('Error submitting Mesh Network config:', error));
+        // }
         // Function to submit Mesh Configuration
         function submitMeshConfig() {
             const form = document.getElementById('meshConfigForm');
             const meshConfig = {
-                BrokerAddress: form.brokerAddress.value.split(':').map(part => parseInt(part, 16)), // Convert MAC address to array of integers
+                BrokerAddress: form.brokerAddress.value, // Save MAC address as a string
                 wifiChannel: parseInt(form.wifiChannel.value),
                 id: parseInt(form.nodeId.value),
                 netId: parseInt(form.netId.value),
-                role: form.role.value,
+                role: form.meshrole.value,
                 debug: form.debug.checked,
                 macSlaves: form.macSlaves.value.split(',').map(mac => mac.trim()), // Split and trim MAC addresses
-                dataVersion: parseInt(form.dataVersion.value)
+                dataVersion: parseInt(form.dataVersion.value),
+                boardModel: form.boardModel.value
             };
 
             console.log('Submitting Mesh config:', meshConfig);
@@ -591,8 +686,7 @@
                 .then(response => response.json())
                 .then(data => {
                     document.getElementById('brokerAddress').value = Array.isArray(data.BrokerAddress) && data.BrokerAddress.length > 0 
-                        ? data.BrokerAddress.map(byte => byte.toString(16).padStart(2, '0')).join(':') 
-                        : '';
+                        ? data.BrokerAddress.map(byte => byte.toString(16).padStart(2, '0')).join(':') : '';
                     document.getElementById('wifiChannel').value = data.wifiChannel || '';
                     document.getElementById('nodeId').value = data.id || '';
                     document.getElementById('netId').value = data.netId || '';
@@ -600,6 +694,7 @@
                     document.getElementById('debug').checked = data.debug || false;
                     document.getElementById('macSlaves').value = data.macSlaves ? data.macSlaves.join(',') : '';
                     document.getElementById('dataVersion').value = data.dataVersion || 0;
+                    document.getElementById('boardModel').value = data.boardModel || ''; 
                 })
                 .catch(error => console.error('Error loading Mesh config:', error));
         }
@@ -609,6 +704,7 @@
         window.onload = function () {
             loadWiFiMQTTConfig();
             loadMeshConfig();
+            loadLoRaRYConfig();
         };
 
         // Submit MQTT Configuration

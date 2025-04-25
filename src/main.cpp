@@ -1,4 +1,28 @@
 #include "main.h"
+
+int8_t BUZZ = -1;
+int8_t SETUP_BUTTON = -1;
+int8_t LED_STT = -1;
+int8_t I2C_SDA = -1;
+int8_t I2C_SCL = -1;
+int8_t Y8 = -1;
+int8_t Y9 = -1;
+int8_t DA0 = -1;
+int8_t DA1 = -1;
+int8_t InPut0 = -1;
+int8_t InPut1 = -1;
+int8_t InPut2 = -1;
+int8_t InPut3 = -1;
+int8_t Ser_1RX = -1;
+int8_t Ser_1TX = -1;
+int8_t M0_PIN = -1;
+int8_t M1_PIN = -1;
+int8_t ETH_POWER_PIN_ALTERNATIVE = -1;
+int8_t ETH_MDC_PIN = -1;
+int8_t ETH_MDIO_PIN = -1;
+int8_t Ser_2RX = -1;
+int8_t Ser_2TX = -1;
+
 #include "WebInterface.h"
 WebinterFace mainwebInterface;
 #ifdef USE_Modbus
@@ -24,6 +48,7 @@ struct Config {
     bool debug;  // Enable/disable debug prints
     JsonArray macSlaves;
     int dataVersion; // Data version 0: Lookline v1, 1: Lookline v2, 2: Modbus Register, 3: Serial TTL
+    byte boardModel;
 } MeshConfig;
 
 struct __attribute__((packed)) dataPacket {
@@ -75,8 +100,79 @@ IPAddress apIP(192,168,4,1);
 IPAddress subnet(255, 255, 255, 0);
 bool configMode = false;
 
+//BUZZ | SETUP_BUTTON | LED_STT | I2C_SDA | I2C_SCL | Y8 | Y9 | DA0 | DA1 | InPut0 | InPut1 | InPut2 | InPut3 | InPut4 | Ser_1RX | Ser_1TX | M0_PIN | M1_PIN | ETH_POWER_PIN_ALTERNATIVE | ETH_MDC_PIN | ETH_MDIO_PIN | Ser_2RX | Ser_2TX
 
-
+int8_t Board0[] = {-1, 26, 25, 21, 22, -1, -1, -1, -1, -1, -1, -1, 15, 15,  2, -1, -1, -1, -1, -1, 16, 17};
+int8_t Board1[] = {12, 13,  4, 32, 33,  4,  5, 39, 36,  0, 34, 35, 15, 32, 33, -1, -1, 14, 23, 18, 16, 17};
+int8_t Board2[] = {-1, 26, 27, 21, 22, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 16, 17};
+int8_t Board3[] = {-1, 26, 25, 21, 22, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 16, 17};
+int8_t Board4[] = {
+    -1,  // BUZZ
+    0,   // SETUP_BUTTON
+    13,  // LED_STT
+    21,  // I2C_SDA
+    22,  // I2C_SCL
+    -1,  // Y8
+    -1,  // Y9
+    36,  // DA0
+    39,  // DA1
+    0,   // InPut0
+    33,  // InPut1
+    32,  // InPut2
+    34,  // InPut3
+    35,  // InPut4
+    2,   // Ser_1RX
+    4,   // Ser_1TX
+    16,  // M0_PIN
+    17,  // M1_PIN
+    16,  // ETH_POWER_PIN_ALTERNATIVE
+    23,  // ETH_MDC_PIN
+    18,  // ETH_MDIO_PIN
+    16,  // Ser_2RX
+    17   // Ser_2TX
+};
+void set_Pinout(uint8_t BoardModel){
+    int8_t* selectedBoard;
+    switch (BoardModel) {
+        case 0:
+        selectedBoard = Board0;
+        break;
+        case 1:
+        selectedBoard = Board1;
+        break;
+        case 2:
+        selectedBoard = Board2;
+        break;
+        case 3:
+        selectedBoard = Board3;
+        break;
+        default:
+        selectedBoard = nullptr; // Handle invalid BoardModel
+        break;
+    }
+    BUZZ = selectedBoard[0];
+    SETUP_BUTTON = selectedBoard[1];
+    LED_STT = selectedBoard[2];
+    I2C_SDA = selectedBoard[3];
+    I2C_SCL = selectedBoard[4];
+    Y8 = selectedBoard[5];
+    Y9 = selectedBoard[6];
+    DA0 = selectedBoard[7];
+    DA1 = selectedBoard[8];
+    InPut0 = selectedBoard[9];
+    InPut1 = selectedBoard[10];
+    InPut2 = selectedBoard[11];
+    InPut3 = selectedBoard[12];
+    Ser_1RX = selectedBoard[13];
+    Ser_1TX = selectedBoard[14];
+    M0_PIN = selectedBoard[15];
+    M1_PIN = selectedBoard[16];
+    ETH_POWER_PIN_ALTERNATIVE = selectedBoard[17];
+    ETH_MDC_PIN = selectedBoard[18];
+    ETH_MDIO_PIN = selectedBoard[19];
+    Ser_2RX = selectedBoard[20];
+    Ser_2TX = selectedBoard[21];
+}
 // void WiFiEvent(WiFiEvent_t event);
 void convertDataPacketToDataLookline(const dataPacket &packet, struct_Parameter_messageOld &dataLookline);
   
@@ -98,6 +194,90 @@ Modbus_Prog iMagModbusCom;
   #include "Network/Modbus_TCP.h"
   Modbus_TCP_Prog iMagModbusCom;
   #endif//TCP_ETH
+  void MainLoop();
+#include "esp_wifi.h"
+
+  uint8_t current_protocol;
+  wifi_interface_t current_wifi_interface;
+  /////////////////////////////////////////////// WIFI RF Function /////////////////////////////////////////////////
+  byte rssi_display = 0;
+  typedef struct {
+    unsigned frame_ctrl: 16;
+    unsigned duration_id: 16;
+    uint8_t addr1[6]; /* receiver address */
+    uint8_t addr2[6]; /* sender address */
+    uint8_t addr3[6]; /* filtering address */
+    unsigned sequence_ctrl: 16;
+    uint8_t addr4[6]; /* optional */
+  } wifi_ieee80211_mac_hdr_t;
+  
+  typedef struct {
+    wifi_ieee80211_mac_hdr_t hdr;
+    uint8_t payload[0]; /* network data ended with 4 bytes csum (CRC32) */
+  } wifi_ieee80211_packet_t;
+  //La callback que hace la magia
+  void promiscuous_rx_cb(void *buf, wifi_promiscuous_pkt_type_t type) {
+    // All espnow traffic uses action frames which are a subtype of the mgmnt frames so filter out everything else.
+    if (type != WIFI_PKT_MGMT)
+      return;
+  
+    const wifi_promiscuous_pkt_t *ppkt = (wifi_promiscuous_pkt_t *)buf;
+    const wifi_ieee80211_packet_t *ipkt = (wifi_ieee80211_packet_t *)ppkt->payload;
+    const wifi_ieee80211_mac_hdr_t *hdr = &ipkt->hdr;
+  
+    int rssi = ppkt->rx_ctrl.rssi;
+    rssi_display = rssi;
+  }
+  void Mainloop(); 
+  void init_wifi_promiscuous_mode() {
+    // Set the WiFi to promiscuous mode
+    // esp_wifi_set_promiscuous(true);
+    // esp_wifi_set_promiscuous_rx_cb(&promiscuous_rx_cb);
+    // esp_wifi_set_channel(MeshConfig.wifiChannel, WIFI_SECOND_CHAN_NONE); // Set the WiFi channel
+    // wifi_interface_t current_wifi_interface = WIFI_IF_STA; // Sử dụng giao diện Wi-Fi Station
+    esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_LR); // Set the WiFi protocol  WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N | WIFI_PROTOCOL_LR
+    // esp_wifi_set_ps(WIFI_PS_NONE); // Disable power save mode
+    // esp_wifi_set_max_tx_power(78); // 78 tương ứng với 20 dBm
+    
+  }
+  void init_wifi() {
+    esp_err_t addStatus = esp_wifi_start();
+    if (addStatus == ESP_OK) {LOGLN("esp_wifi_start success"); }
+    else{LOGLN("esp_wifi_start failed");}
+    // Set the WiFi to station mode
+    // esp_wifi_set_promiscuous(true);
+    esp_wifi_set_promiscuous_rx_cb(&promiscuous_rx_cb);
+    esp_wifi_set_channel(MeshConfig.wifiChannel, WIFI_SECOND_CHAN_NONE); // Set the WiFi channel
+    esp_wifi_set_protocol(current_wifi_interface, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N ); // Set the WiFi protocol
+    esp_wifi_set_ps(WIFI_PS_NONE); // Disable power save mode
+  }
+  
+  int check_protocol()
+  {
+    // CONFIG::read_byte (EP_EEPROM_DEBUG, &MeshDebug);
+      char error_buf1[100];
+    // if(MeshDebug){
+      LOGLN();
+       esp_err_t error_code = esp_wifi_get_protocol(current_wifi_interface, &current_protocol);
+       esp_err_to_name_r(error_code,error_buf1,100);
+       LOG("esp_wifi_get_protocol error code: ");
+       LOGLN(error_buf1);
+      LOGLN("Code: " + String(current_protocol));
+      if ((current_protocol&WIFI_PROTOCOL_11B) == WIFI_PROTOCOL_11B)
+        LOGLN("Protocol is WIFI_PROTOCOL_11B");
+      if ((current_protocol&WIFI_PROTOCOL_11G) == WIFI_PROTOCOL_11G)
+        LOGLN("Protocol is WIFI_PROTOCOL_11G");
+      if ((current_protocol&WIFI_PROTOCOL_11N) == WIFI_PROTOCOL_11N)
+        LOGLN("Protocol is WIFI_PROTOCOL_11N");
+      if ((current_protocol&WIFI_PROTOCOL_LR) == WIFI_PROTOCOL_LR)
+        LOGLN("Protocol is WIFI_PROTOCOL_LR");
+      LOGLN("___________________________________");
+      LOGLN();
+      LOGLN();
+    // }
+      return current_protocol;
+  }
+
 void SupendTask(){
     vTaskSuspend(TaskModbus);
 }
@@ -107,7 +287,7 @@ void ResumeTask(){
 void ModbusInit(String ModbusParameter)
 {
     #ifdef RTU_RS485
-    iMagModbusCom.modbus_setup(ModbusParameter);
+    iMagModbusCom.modbus_setup(ModbusParameter, Ser_2RX, Ser_2TX);
     #endif//RTU_RS485
     #ifdef TCP_ETH
         if((const char*)mainModbusSetting["role"] == "master"){TCP_setup(0);}
@@ -188,7 +368,7 @@ void DataForPC(){
 }
 void SerialInit() {
     #ifdef USE_SERIAL1
-    Serial1.begin(Se_BAUD_RATE, SERIAL_8N1, Se_dRX_PIN, Se_TX_PIN);
+    Serial1.begin(Se_BAUD_RATE, SERIAL_8N1, Ser_1RX, Ser_1TX);
     Serial1.println("Serial1 initialized.");
     #endif//USE_SERIAL1
     #ifdef USE_SERIAL2
@@ -227,6 +407,7 @@ void loadConfig() {
         DynamicJsonDocument doc(512);
         MeshConfig.macSlaves = doc.createNestedArray("macSlaves");
         MeshConfig.dataVersion = 0; // Default dataVersion
+        MeshConfig.boardModel = 0;
         saveConfig();
         return;
     }
@@ -244,7 +425,7 @@ void loadConfig() {
         Serial.println(error.c_str());
         return;
     }
-
+    MeshConfig.boardModel = doc["boardModel"];
     const char* BrokerStr = doc["BrokerAddress"];
     if (BrokerStr) {
         int values[6];
@@ -269,7 +450,9 @@ void loadConfig() {
     MeshConfig.debug = doc["debug"] | true; // Default debug enabled
     MeshConfig.macSlaves = doc["macSlaves"].as<JsonArray>();
     file.close();
+    set_Pinout(MeshConfig.boardModel);
     if (MeshConfig.debug) Serial.println("Config loaded.");
+    mainLoRa.LoRaSetup(MeshConfig.id);
 }
 
 void saveConfig() {
@@ -287,6 +470,7 @@ void saveConfig() {
     doc["dataVersion"] = MeshConfig.dataVersion; // Save data version
     doc["role"] = MeshConfig.role; // Save role
     doc["debug"] = MeshConfig.debug; // Save debug flag
+    doc["boardModel"] = MeshConfig.boardModel; //Save board model
     JsonArray macArray = doc.createNestedArray("macSlaves");
     for (JsonVariant value : MeshConfig.macSlaves) {
         macArray.add(value.as<const char*>());
@@ -397,7 +581,9 @@ void processSerialInput() {
                     JsonArray macArray = doc["macSlaves"].as<JsonArray>();
                     MeshConfig.macSlaves = macArray;
                 }
-
+                if (doc.containsKey("boardModel")) {
+                    MeshConfig.boardModel = doc["boardModel"];
+                }
                 saveConfig();
                 if (MeshConfig.debug) Serial.println("Config updated.");
             }
@@ -412,6 +598,24 @@ void processSerialInput() {
 void printConfig() {
     if (!MeshConfig.debug) return; // Skip printing if debug is disabled
     Serial.println("===== Current Config =====");
+    Serial.print("Board Model: ");
+    switch (MeshConfig.boardModel) {
+        case 0:
+            Serial.println("Board ModRTUMesh");
+            break;
+        case 1:
+            Serial.println("Board 410WER");
+            break;
+        case 2:
+            Serial.println("Board LklineGw");
+            break;
+        case 3:
+            Serial.println("Board LklineNode");
+            break;
+        default:
+            Serial.println("Unknown Board Model");
+            break;
+    }
     Serial.print("Broker Address: ");
     Serial.println(convertBrokerAddressToString(MeshConfig.BrokerAddress));
     Serial.print("WiFi Channel: ");
@@ -582,10 +786,15 @@ void receiveCallback(const uint8_t *senderMac, const uint8_t *data, int dataLen)
     char macStr[18];
     snprintf(macStr, sizeof(macStr), "%02x:%02x:%02x:%02x:%02x:%02x", senderMac[0], senderMac[1], senderMac[2], senderMac[3], senderMac[4], senderMac[5]);
     if(dataLen == sizeof(dataPacket)) {
+        digitalWrite(LED_STT, !digitalRead(LED_STT)); // Toggle LED state
+        delay(100);
+        digitalWrite(LED_STT, !digitalRead(LED_STT)); // Toggle LED state
             if (MeshConfig.debug) Serial.println("DataPacket received from Mesh (dataVersion = 1):");
             if (MeshConfig.debug) Serial.print("ID: " + String(MeshConfig.id) + " | ");
             if (MeshConfig.debug) Serial.print("Received data from: ");
             if (MeshConfig.debug) Serial.println(macStr);
+            if (MeshConfig.debug) Serial.println("RSSI: " + String(rssi_display));
+
             memcpy(&packet, data, sizeof(packet));
             dataQueue.push(packet); // Lưu vào hàng đợi
             #ifdef USE_SERIAL1
@@ -790,26 +999,41 @@ void Broker(const String &message)
 unsigned long buttonPressTime = 0;
 
 void startConfigPortal() {
-    // WiFi.onEvent(WiFiEvent);
-    // Set up the access point for configuration mode
-    #ifdef USE_Modbus
-    if(wifiMode != "STA"){ //AP Mode
-    #endif//USE_Modbus
-        if (MeshConfig.debug) Serial.println("Starting configuration portal...");
-        WiFi.disconnect();
-        WiFi.mode(WIFI_OFF);
-        dnsServer.stop();
-        if (MeshConfig.debug) Serial.println("Starting configuration portal...");
-        WiFi.mode(WIFI_AP);
+    if (MeshConfig.debug) Serial.println("Starting configuration portal...");
+
+    // Dừng ESP-NOW nếu đang chạy
+    // if (esp_now_deinit() == ESP_OK) {
+    //     if (MeshConfig.debug) Serial.println("Mesh deInit Success");
+    // } else {
+    //     if (MeshConfig.debug) Serial.println("Mesh deInit Failed");
+    // }
+
+    // Ngắt kết nối WiFi và đặt chế độ WiFi về OFF
+    WiFi.disconnect();
+    WiFi.mode(WIFI_OFF);
+    dnsServer.stop();
+    
+    WiFi.mode(WIFI_AP);
+    // Đặt lại giao thức WiFi về mặc định
+    esp_err_t result = esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N );
+    if (result == ESP_OK) {
+        if (MeshConfig.debug) Serial.println("WiFi protocol set successfully.");
+    } else {
+        if (MeshConfig.debug) Serial.print("Failed to set WiFi protocol. Error: ");
+        if (MeshConfig.debug) Serial.println(esp_err_to_name(result));
+    }
+        // WiFi.mode(WIFI_AP);
         WiFi.softAPConfig(apIP, apIP, subnet);
         String APname = "MeshModule_" + String(MeshConfig.id);
         WiFi.softAP(APname.c_str(), "12345678"); // Replace with your desired SSID and password
         dnsServer.start(DNS_PORT, "*", apIP);
+
+        check_protocol();
         configMode = true;
         if (MeshConfig.debug) Serial.println("Configuration portal started.");
         mainwebInterface.setupWebConfig();
         #ifdef USE_Modbus
-    }
+    // }
     #endif//USE_Modbus
 }
 void checkConfigButton() {
@@ -1023,15 +1247,26 @@ void TskModbus(void *pvParameter)
 {
     LOG("TaskModbus Run in core ");
     LOGLN(xPortGetCoreID());
+    
+    MQTTwifiConfig.setup();
     for (;;)
     {
+        if(!configMode){
         #ifdef USE_Modbus
-            ModbusLoop(3000);   
+            ModbusLoop(3000);  
         #endif//USE_Modbus
-        
+            MainLoop();
+        } 
+        if(configMode){
+            dnsServer.processNextRequest();
+            static long timeCount = 0;
+            if (millis() - timeCount >= 200) {
+                timeCount = millis();
+                digitalWrite(LED_STT, !digitalRead(LED_STT)); // Toggle LED state
+            }
+        } 
         checkConfigButton();// Button Setup
         processSerialInput();// Serial input cmnd processing
-        processQueue();
     }
 }
 void TaskWifiMQTT(void *pvParameter)
@@ -1039,14 +1274,12 @@ void TaskWifiMQTT(void *pvParameter)
     LOG("TaskMQTT Run in core ");
     LOGLN(xPortGetCoreID());
     #ifdef USE_Modbus
-    MQTTwifiConfig.setup();
     #endif//USE_Modbus
     for (;;)
     {
         #ifdef USE_Modbus
         MQTTwifiConfig.loop();
         #endif//USE_Modbus
-
     }
 }
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1070,14 +1303,14 @@ void setup()
     }
     loadConfig();
     printConfig();
-    pinMode(M0_PIN, OUTPUT);
-    pinMode(M1_PIN, OUTPUT);
-    pinMode(M0_PIN_1, OUTPUT);
-    pinMode(M1_PIN_1, OUTPUT);
-    digitalWrite(M0_PIN, LOW);
-    digitalWrite(M1_PIN, LOW);
-    digitalWrite(M0_PIN_1, LOW);
-    digitalWrite(M1_PIN_1, LOW);
+    // pinMode(M0_PIN, OUTPUT);
+    // pinMode(M1_PIN, OUTPUT);
+    // pinMode(M0_PIN_1, OUTPUT);
+    // pinMode(M1_PIN_1, OUTPUT);
+    // digitalWrite(M0_PIN, LOW);
+    // digitalWrite(M1_PIN, LOW);
+    // digitalWrite(M0_PIN_1, LOW);
+    // digitalWrite(M1_PIN_1, LOW);
     #ifdef USE_Modbus
         // Truyền chuỗi JSON vào hàm ModbusInit
         String  StrConfig = mainModbusConfig.loadModbusConfig(MeshConfig.debug, FileSystem);
@@ -1115,6 +1348,8 @@ void setup()
         {
             esp_now_add_peer(&peerInfo);
         }
+        init_wifi_promiscuous_mode();
+        check_protocol();
     }
     else
     {
@@ -1142,24 +1377,54 @@ void setup()
     // use the built in button
     pinMode(SETUP_BUTTON, INPUT_PULLUP);
     pinMode(LED_STT, OUTPUT);
-    digitalWrite(LED_STT, LOW); // turn off the LED
+    digitalWrite(LED_STT, HIGH); // turn off the LED
     #ifdef USE_Modbus
     mainModbusSetting = JSON.parse(mainModbusConfig.loadModbusConfig(MeshConfig.debug, FileSystem));
     #endif//USE_Modbus
-    xTaskCreatePinnedToCore(TskModbus, "TaskModbus", 5000, NULL, 2, &TaskModbus, 1);
-    mainLoRa.LoRaSetup();
+    xTaskCreatePinnedToCore(TskModbus, "TaskModbus", 10000, NULL, 2, &TaskModbus, 1);
     rtcTimeOnl.Time_setup();
+    #ifdef Module_10O4I
+    pinMode(BUZZ, OUTPUT);
+    pinMode(Y8, OUTPUT);
+    pinMode(Y9, OUTPUT);
+    digitalWrite(BUZZ, HIGH);delay(100);digitalWrite(BUZZ, LOW);
+    #endif
 }
 long timeCount = 0;
+bool once1 = false;
 void loop()
 {
-    // mainLoRa.LoRaLoop();
+    static long ModbusCurrentMillis = millis();
+    if(millis() -  ModbusCurrentMillis >= 3000) {
+        ModbusCurrentMillis = millis();
+        if (MeshConfig.debug) Serial.println("========================================================================");
+        if (MeshConfig.debug) Serial.println("                          Loop Function");
+        if (MeshConfig.debug) Serial.println("========================================================================");
+    }
+
+    processQueue();
+}
+
+void MainLoop()
+{
+    if(once1 == false){
+        if (MeshConfig.debug) Serial.println("========================================================================");
+        if (MeshConfig.debug) Serial.println("                          Start Main Loop");
+        if (MeshConfig.debug) Serial.println("========================================================================");
+        once1 = true;
+    }
+    if(!configMode){
+        MQTTwifiConfig.loop();
+        // mainLoRa.receiveData();
     if(MeshConfig.dataVersion == 3 || MeshConfig.dataVersion == 0){receiveDataPacketFromSerial2();}//Data version3: Send recive data from Serial2 to Mesh
     if(MeshConfig.role == "Broker"){receiveDataPacketFromSerial2();}//Data version3: Send recive data from Serial2 to Mesh
     static int randomDelay = 3000;
     static long ModbusCurrentMillis = millis();
-    if(millis() -  ModbusCurrentMillis >= 3000) {randomDelay = random(2500, 3000);
-        ModbusCurrentMillis = millis();
+    if(millis() -  ModbusCurrentMillis >= randomDelay) {randomDelay = random(2500, 3000);
+        ModbusCurrentMillis = millis();  
+    if(MeshConfig.role == "Node"){if(LoRaInit)mainLoRa.LoRaLoop(2);}//Data version3: Send recive data from Serial2 to Mesh
+        Serial.println("Loop with dataVersion = " + String(MeshConfig.dataVersion) +" with Mesh role " + MeshConfig.role + " | LoRa Init: " + String(LoRaInit ? "connected":"disconnected"));
+
         #ifdef USE_MQTT
         if(WiFi.status() == WL_CONNECTED && mqttIsConnected == true) {
             String payloadSent = "";
@@ -1232,7 +1497,7 @@ void loop()
                 // }
                 // LOGLN();
             }
-            if(MeshConfig.dataVersion == 2){
+            if(MeshConfig.dataVersion == 2 && !configMode){
                 uint8_t dataIndex = 0; // Index to track position in dataPacket.data
                 for (int i = 0; i < (int)mainModbusSetting["Value"].length(); i++) {
                     if ((int)mainModbusSetting["Type"][i] == 0) {
@@ -1274,31 +1539,35 @@ void loop()
                 }
                 packet.ID = MeshConfig.id;
                 packet.netId = MeshConfig.netId;
+                Serial.println("DataPacket sent dataVersion = 2) with Mesh role " + MeshConfig.role);
                 if(MeshConfig.role == "Node" || MeshConfig.role == "Repeater"){
                     int result = esp_now_send(MeshConfig.BrokerAddress, (uint8_t *)&packet, sizeof(packet));
-                        if (result == 0)
-                        {
-                            if (MeshConfig.debug) Serial.println("Node message success");
-                        }
-                        else
-                        {
-                            if (MeshConfig.debug) Serial.println("Unknown error");
-                        }
+                    if (result == 0)
+                    {
+                        if (MeshConfig.debug) Serial.println("Node message success");
                     }
+                    else
+                    {
+                        if (MeshConfig.debug) Serial.println("Unknown error");
+                    }
+                }
+                if(MeshConfig.role == "Broker"){
+                    static const uint8_t defaultBrokerAddress[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+                    int result = esp_now_send(defaultBrokerAddress, (uint8_t *)&packet, sizeof(packet));
+                    if (result == 0)
+                    {
+                        if (MeshConfig.debug) Serial.println("Broker message success");
+                    }
+                    else
+                    {
+                        if (MeshConfig.debug) Serial.println("Unknown error");
+                    }
+                }
             }//Data version2: Modbus Reg
         #endif//USE_Modbus
     }
 #ifdef ESP32
-    if(configMode){
-        dnsServer.processNextRequest();
-        static long timeCount = 0;
-        if (millis() - timeCount >= 200) {
-            timeCount = millis();
-            digitalWrite(LED_STT, !digitalRead(LED_STT)); // Toggle LED state
-        }
-    } else {
-        digitalWrite(LED_STT, LOW); // Turn off the LED when not in config mode
-    }
+   
 #else 
     int result = esp_now_send(MeshConfig.BrokerAddress, (uint8_t *) &packet, sizeof(packet));
     if (result == 0)
@@ -1309,7 +1578,8 @@ void loop()
     {
         if (MeshConfig.debug) Serial.println("Unknown error");
     }
-    
+
 #endif//ESP32
-    // delay(3000);
+    }
+// delay(3000);
 }

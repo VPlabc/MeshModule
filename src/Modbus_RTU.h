@@ -111,7 +111,7 @@ void MonitorData();
 uint32_t DWORD(uint16_t u1, uint16_t u2);
 uint16_t GetHoldingReg(uint16_t addr);
 bool GetCoilReg(uint16_t addr);
-void modbus_setup(String ModbusParameter) ;
+void modbus_setup(String ModbusParameter, int8_t RXpin, int8_t TXpin) ;
 void modbus_loop(int Timeout);
 //////////////////////////////
 void debugs();

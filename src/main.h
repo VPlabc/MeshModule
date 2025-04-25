@@ -1,3 +1,6 @@
+#ifndef Main_H
+#define Main_H
+
 #define USE_LITTLEFS // Ensure LittleFS is used
 // #define ESP32_RISCV
 
@@ -43,19 +46,50 @@
 #include <freertos/queue.h>
 #include <freertos/task.h>
 
+#include "esp_wifi.h"
 
+
+#define Module_RS485
+// #define Module_10O4I
 
 #define CONFIG_FILE "/config.json"
 #define MACLIST_FILE "/maclist.json"
-#define SETUP_BUTTON  26 // GPIO 0
-#define LED_STT  25 // GPIO 2
-#define M0_PIN  5
-#define M1_PIN  27 
 
-#define M0_PIN_1  2 
-#define M1_PIN_1  15
+extern int8_t BUZZ;
+extern int8_t SETUP_BUTTON;
+extern int8_t LED_STT;
+extern int8_t I2C_SDA;
+extern int8_t I2C_SCL;
+extern int8_t Y8;
+extern int8_t Y9;
+extern int8_t DA0;
+extern int8_t DA1;
+extern int8_t InPut0;
+extern int8_t InPut1;
+extern int8_t InPut2;
+extern int8_t InPut3;
+extern int8_t Ser_1RX;
+extern int8_t Ser_1TX;
+extern int8_t M0_PIN;
+extern int8_t M1_PIN;
+extern int8_t ETH_POWER_PIN_ALTERNATIVE;
+extern int8_t ETH_MDC_PIN;
+extern int8_t ETH_MDIO_PIN;
+extern int8_t Ser_2RX;
+extern int8_t Ser_2TX;
 
 
+#ifdef Module_10O4I
+// #include "Adafruit_MCP23008.h"
+#define ETH_ADDR 1
+#define ETH_POWER_PIN -1 // Do not use it, it can cause conflict during the software reset.
+#define ETH_TYPE ETH_PHY_LAN8720
+#define ETH_CLK_MODE ETH_CLOCK_GPIO0_IN
+
+
+
+#endif// Module 10O4I
+#define Se_BAUD_RATE 115200
 // #define MY_ROLE         ESP_NOW_ROLE_COMBO              // set the role of this device: CONTROLLER, SLAVE, COMBO
 // #define RECEIVER_ROLE   ESP_NOW_ROLE_COMBO              // set the role of the receiver
 // #define WIFI_CHANNEL    1
@@ -78,6 +112,5 @@ void sentCallback(const uint8_t *macAddr, esp_now_send_status_t status);
 void SupendTask();
 void ResumeTask();
 #endif//Gateway
-#define Se_dRX_PIN 2//4
-#define Se_TX_PIN 15//5
-#define Se_BAUD_RATE 115200
+
+#endif//Main_h

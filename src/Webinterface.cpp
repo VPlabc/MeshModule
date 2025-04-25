@@ -90,6 +90,45 @@ void WebinterFace::setupWebConfig() {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////// LoRa netwwork //////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Endpoint: Load LoRa configuration
+// void configureLoRaModule(int address, int networkID, int power, long frequency, int spreadingFactor, int bandwidth, int codingRate, int preamble);
+// String getLoRaModuleConfig();
+// Endpoint: Configure LoRa module
+server.on("/configure-lora", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
+[](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+    String body = String((char*)data).substring(0, len);
+    DynamicJsonDocument doc(1024);
+
+    DeserializationError error = deserializeJson(doc, body);
+    if (error) {
+        request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+        return;
+    }
+
+
+    int address = doc["address"] | 0;
+    int networkID = doc["networkID"] | 0;
+    int power = doc["power"] | 0;
+    long frequency = doc["frequency"] | 0;
+    int spreadingFactor = doc["spreadingFactor"] | 0;
+    int bandwidth = doc["bandwidth"] | 0;
+    int codingRate = doc["codingRate"] | 0;
+    int preamble = doc["preamble"] | 0;
+
+    // Call the configureLoRaModule function with the provided parameters
+    configLoRa.configureLoRaModule(address, networkID, power, frequency, spreadingFactor, bandwidth, codingRate, preamble);
+
+    request->send(200, "application/json", "{\"status\":\"LoRa configuration applied\"}");
+});
+
+
+// Endpoint: Load LoRa module configuration
+server.on("/load-lora-config", HTTP_GET, [](AsyncWebServerRequest *request) {
+    // Call the getLoRaModuleConfig function to retrieve the configuration
+    String config = configLoRa.getLoRaModuleConfig();
+    Serial.println(config);
+    request->send(200, "application/json", config);
+});
     // configureE32(String json)
     // Endpoint: Configure E32 with JSON
     server.on("/configure-e32", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
@@ -108,7 +147,7 @@ void WebinterFace::setupWebConfig() {
         serializeJson(doc, jsonConfig);
 
         // Call the configureE32 function with the JSON string
-        configLoRa.configureE32(jsonConfig);
+        // configLoRa.configureE32(jsonConfig);
 
         request->send(200, "application/json", "{\"status\":\"Configuration applied\"}");
     });
@@ -124,6 +163,7 @@ struct Config {
     bool debug;         // Enable/disable debug prints
     JsonArray macSlaves;// Array of MAC addresses for slaves
     int dataVersion; // Data version 0: Lookline v1, 1: Lookline v2, 2: Modbus Register, 3: Serial TTL
+    byte boardModel;
 } MeshConfig;
 
 // Endpoint: Load Mesh configuration from file

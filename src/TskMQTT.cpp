@@ -250,42 +250,13 @@ void WifiMqttConfig::MQTTPush(String Topic,String Payload) {
 static int reconnectAttempts = 0; // Biến đếm số lần thử kết nối lại
 void connectToWifi() {
     Serial.println("Connecting to Wi-Fi...");
+    Serial.print("SSID: ");
+    Serial.println(ssid);
+    Serial.print("Password: ");
+    Serial.println(pass);
     WiFi.begin(ssid.c_str(), pass.c_str()); 
-    while(WiFi.status() != WL_CONNECTED) {
-        Serial.print(".");
-        delay(500); // Thêm delay để tránh vòng lặp quá nhanh
-        if (reconnectAttempts++ > 20) {
-            Serial.println("Connect to WiFi fail.");
-            break;
-        }
-    }
-    if (reconnectAttempts >= 3) {
-        Serial.println("Failed to connect to Wi-Fi after 3 attempts. Switching to AP mode.");
-        // Cập nhật cấu hình sang chế độ AP
-        wifiMode = "AP";
-        DynamicJsonDocument doc(1024);
-        doc["mqttEnable"] = mqttEnable;
-        doc["mqttHost"] = mqttHost;
-        doc["mqttPort"] = mqttPort;
-        doc["mqttUser"] = mqttUser;
-        doc["mqttPass"] = mqttPass;
-        doc["wifiMode"] = wifiMode; // Lưu chế độ WiFi (STA hoặc AP)
-        doc["ssid"] = ssid;
-        doc["pass"] = pass;
-        doc["conId"] = conId;
-        doc["mqttTopic"] = mqttTopic;
-        doc["mqttTopicSub"] = mqttTopicSub;
+    reconnectAttempts++;
     
-        File configFile = LittleFS.open(WIFIMQTT_FILE, "w");
-        if (!configFile) {
-            Serial.println("Failed to open config file for writing.");
-            return;
-        }
-        serializeJson(doc, configFile);
-        configFile.close();
-        delay(1000);
-        ESP.restart();
-    }
   }
   
   void connectToMqtt() {
@@ -439,8 +410,35 @@ void connectToWifi() {
         connectToWifi();
     }
   }
-
+bool once2 = true;
   void WifiMqttConfig::loop(){
-
+    if(once2){once2 = false;Serial.println("MQTT loop.");}
+    if (reconnectAttempts >= 3) {
+        Serial.println("Failed to connect to Wi-Fi after 3 attempts. Switching to AP mode.");
+        // Cập nhật cấu hình sang chế độ AP
+        wifiMode = "AP";
+        DynamicJsonDocument doc(1024);
+        doc["mqttEnable"] = mqttEnable;
+        doc["mqttHost"] = mqttHost;
+        doc["mqttPort"] = mqttPort;
+        doc["mqttUser"] = mqttUser;
+        doc["mqttPass"] = mqttPass;
+        doc["wifiMode"] = wifiMode; // Lưu chế độ WiFi (STA hoặc AP)
+        doc["ssid"] = ssid;
+        doc["pass"] = pass;
+        doc["conId"] = conId;
+        doc["mqttTopic"] = mqttTopic;
+        doc["mqttTopicSub"] = mqttTopicSub;
+    
+        File configFile = LittleFS.open(WIFIMQTT_FILE, "w");
+        if (!configFile) {
+            Serial.println("Failed to open config file for writing.");
+            return;
+        }
+        serializeJson(doc, configFile);
+        configFile.close();
+        delay(1000);
+        ESP.restart();
+    }
   }
   #endif//MQTT_Client

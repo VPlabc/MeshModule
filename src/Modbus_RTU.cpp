@@ -135,7 +135,7 @@ extern String connId[4];
 extern String Tag[40];
 extern int AddrOffset;
 
-void Modbus_Prog::modbus_setup(String ModbusParameter) {
+void Modbus_Prog::modbus_setup(String ModbusParameter, int8_t RXpin, int8_t TXpin) {
   #ifdef RTU_RS485
       iMagSetting = JSON.parse(ModbusParameter);
       if (JSON.typeof(iMagSetting) == "undefined") {
@@ -172,7 +172,7 @@ void Modbus_Prog::modbus_setup(String ModbusParameter) {
       //   initupdate();
         if (MBRole == MBmaster) {
           DB_LN("Modbus Master Init");
-          Serial2.begin(9600, SERIAL_8N1, 16 ,17); // RX, TX
+          Serial2.begin(9600, SERIAL_8N1, RXpin ,TXpin); // RX, TX
           Modbus_Master.setTimeoutTimeMs(100);
           Modbus_Master.begin(&Serial2);
         }
@@ -326,5 +326,5 @@ void Modbus_Prog::modbus_loop(int Timeout) {
       mb.task();
       yield();delay(10);
     }
-
+    yield();
 }//loop
