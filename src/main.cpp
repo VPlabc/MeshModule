@@ -7,7 +7,8 @@ WifiMqttConfig wifiMqttConfig;
 #ifdef USE_Modbus
 #include "Modbus_RTU.h"
 Modbus_Prog mainModbusCom;
-#endif//USE_Modbus   
+#endif//USE_Modbus  
+#define ChangeParameter 
 // #include "Project/lookline.h"
 struct Config {
     uint8_t BrokerAddress[6];
@@ -69,14 +70,53 @@ IPAddress apIP(192,168,4,1);
 IPAddress subnet(255, 255, 255, 0);
 bool configMode = false;
 
+bool updateFlag = false;
 
+#include <EEPROM.h>
+#define EEPROM_SIZE 512 // Kích thước EEPROM (tùy thuộc vào nhu cầu)
+#define WIFI_CHANNEL_ADDR 0 // Địa chỉ lưu wifiChanel
+uint8_t wifiChanel = 0;
+void saveWiFiChannelToEEPROM(uint8_t wifiChannel) {
+    EEPROM.begin(EEPROM_SIZE); // Khởi tạo EEPROM với kích thước đã định nghĩa
+    EEPROM.write(WIFI_CHANNEL_ADDR, wifiChannel); // Ghi giá trị wifiChanel vào địa chỉ đã định nghĩa
+    if (EEPROM.commit()) { // Lưu thay đổi vào EEPROM
+        Serial.println("WiFi channel saved to EEPROM.");
+    } else {
+        Serial.println("Failed to save WiFi channel to EEPROM.");
+    }
+    EEPROM.end(); // Kết thúc giao dịch với EEPROM
+}
+void updateWiFiChannel(uint8_t newChannel) {
+    if (newChannel >= 1 && newChannel <= 11) {
+        MeshConfig.wifiChannel = newChannel;
+        saveWiFiChannelToEEPROM(newChannel);
+        Serial.println("WiFi channel updated and saved: " + String(newChannel));
+    } else {
+        Serial.println("Invalid WiFi channel. Must be between 1 and 11.");
+    }
+}
+uint8_t loadWiFiChannelFromEEPROM() {
+    EEPROM.begin(EEPROM_SIZE); // Khởi tạo EEPROM với kích thước đã định nghĩa
+    uint8_t wifiChannel = EEPROM.read(WIFI_CHANNEL_ADDR); // Đọc giá trị từ địa chỉ đã định nghĩa
+    EEPROM.end(); // Kết thúc giao dịch với EEPROM
 
+    // Kiểm tra giá trị hợp lệ (kênh WiFi hợp lệ từ 1 đến 11)
+    if (wifiChannel < 1 || wifiChannel > 11) {
+        Serial.println("Invalid WiFi channel in EEPROM. Setting to default (1).");
+        wifiChannel = 1; // Giá trị mặc định nếu không hợp lệ
+    } else {
+        Serial.println("WiFi channel loaded from EEPROM: " + String(wifiChannel));
+    }
+
+    return wifiChannel;
+}
 // void WiFiEvent(WiFiEvent_t event);
 void convertDataPacketToDataLookline(const dataPacket &packet, struct_Parameter_messageOld &dataLookline);
   
 //#define TCP_ETH
 #define RTU_RS485
 
+TaskHandle_t TskModbus;
 
 #ifdef USE_Modbus
 #include "TskModbus.h"
@@ -201,6 +241,7 @@ String convertBrokerAddressToString(const uint8_t *address) {
 
 #ifndef Gateway
 void loadConfig() {
+        Serial.println("load MeshConfig.");
     if (!FileSystem.exists(CONFIG_FILE)) {
         Serial.println("Config file not found, creating default MeshConfig.");
         // Set default values
@@ -221,14 +262,16 @@ void loadConfig() {
     File file = FileSystem.open(CONFIG_FILE, "r");
     if (!file) {
         Serial.println("Failed to open config file for reading.");
+
         return;
     }
 
-    DynamicJsonDocument doc(512);
+    DynamicJsonDocument doc(1024);
     DeserializationError error = deserializeJson(doc, file);
     if (error) {
         Serial.println("Failed to parse config file.");
         Serial.println(error.c_str());
+
         return;
     }
 
@@ -248,7 +291,7 @@ void loadConfig() {
         if (MeshConfig.debug) Serial.println("BrokerAddress not found in MeshConfig.");
     }
 
-    MeshConfig.wifiChannel = doc["wifiChannel"];
+    // MeshConfig.wifiChannel = doc["wifiChannel"];
     MeshConfig.id = doc["id"];
     MeshConfig.netId = doc["netId"];
     MeshConfig.dataVersion = doc["dataVersion"] | 0; // Default to 0 if not specified
@@ -256,15 +299,18 @@ void loadConfig() {
     MeshConfig.debug = doc["debug"] | true; // Default debug enabled
     MeshConfig.macSlaves = doc["macSlaves"].as<JsonArray>();
     file.close();
+    doc.clear();
     if (MeshConfig.debug) Serial.println("Config loaded.");
 }
 
 void saveConfig() {
+
     File file = FileSystem.open(CONFIG_FILE, "w");
     if (!file) {
         if (MeshConfig.debug) Serial.println("Failed to open config file for writing.");
         return;
     }
+    Serial.println("save MeshConfig.");
 
     DynamicJsonDocument doc(512);
     doc["BrokerAddress"] = convertBrokerAddressToString(MeshConfig.BrokerAddress);
@@ -278,13 +324,17 @@ void saveConfig() {
     for (JsonVariant value : MeshConfig.macSlaves) {
         macArray.add(value.as<const char*>());
     }
-
+    Serial.println("save MeshConfig..");
+    saveWiFiChannelToEEPROM(MeshConfig.wifiChannel);
     if (serializeJson(doc, file) == 0) {
         if (MeshConfig.debug) Serial.println("Failed to write to config file.");
     } else {
         if (MeshConfig.debug) Serial.println("Config saved.");
     }
     file.close();
+    doc.clear();    
+    Serial.println("save MeshConfig...");
+    delay(2000);ESP.restart();
 }
 
 void sendBindRequest() {
@@ -856,13 +906,8 @@ void convertPacketToDataLookline(const uint8_t *data, struct_Parameter_messageOl
     DataLookline.RESULT = (data[2] << 8) | data[3]; // Byte 2-3: RESULT (2 bytes)
     DataLookline.state = data[4];   // Byte 4: state
     DataLookline.Mode = data[5];    // Byte 5: Mode
-    #ifdef ChangeChannel
-    if(data[6] != MeshConfig.wifiChannel){
-        MeshConfig.wifiChannel = data[6]; // Byte 6: wifiChannel
-        saveConfig();
-    }
-    #endif//ChangeChannel
 }
+
 void convertPacketToDataLooklinev1(const uint8_t *data, struct_Parameter_message &DataLooklinev1) {
     DataLooklinev1.networkID = packet.netId; // Byte 0-1: networkID (2 bytes)
     DataLooklinev1.nodeID = packet.ID;      // Byte 0-1: nodeID (2 bytes)
@@ -876,31 +921,24 @@ void convertPacketToDataLooklinev1(const uint8_t *data, struct_Parameter_message
     DataLooklinev1.Cmd = data[9];           // Byte 9: Command
     DataLooklinev1.type = data[10];         // Byte 10: Type
     DataLooklinev1.Nodecounter = (data[11] << 8) | data[12]; // Byte 11-12: Node counter (2 bytes)
-    // if(DataLooklinev1.networkID != MeshConfig.wifiChannel){
-    //     MeshConfig.wifiChannel = DataLooklinev1.networkID; // Byte 6: wifiChannel  
-    //     WiFi.mode(WIFI_STA);
-    //     WiFi.disconnect(); // Ngắt kết nối WiFi để đặt lại kênh
-    //     esp_wifi_set_channel(MeshConfig.wifiChannel, WIFI_SECOND_CHAN_NONE); // Đặt kênh WiFi
-    //     if (esp_now_init() == ESP_OK)
-    //     {
-    //         if (MeshConfig.debug) Serial.println("Mesh Init Success");
-    //         esp_now_register_recv_cb(receiveCallback);
-    //         esp_now_register_send_cb(sentCallback);
-    //         esp_now_peer_info_t peerInfo = {};
-    //         memcpy(&peerInfo.peer_addr, MeshConfig.BrokerAddress, 6);
-    //         peerInfo.channel = MeshConfig.wifiChannel;
-    //         peerInfo.encrypt = false;
-    //         if (!esp_now_is_peer_exist(MeshConfig.BrokerAddress))
-    //         {
-    //             esp_now_add_peer(&peerInfo);
-    //         }
-    //     }
-    //     else
-    //     {
-    //         if (MeshConfig.debug) Serial.println("Mesh Init Failed");
-    //     }
-    //     saveConfig();
-    // }
+
+    
+    #ifdef ChangeParameter
+    if(packet.ID != MeshConfig.id){
+        MeshConfig.id = packet.ID;
+    }
+    if(packet.netId != MeshConfig.netId){
+        MeshConfig.netId = packet.netId;
+    }
+    if(data[13] != MeshConfig.wifiChannel){
+        if(data[13] <= 11 && data[13] > 0){
+            Serial.println("Change Chanel: " + String(MeshConfig.wifiChannel) + " to " + String(data[13]));
+            MeshConfig.wifiChannel = data[13]; // Byte 13: wifiChannel (1 byte)
+            updateFlag = true;
+        }
+    }
+    #endif//ChangeParameter
+
 }
 uint8_t  incomingData[sizeof(struct dataPacket)];
 size_t   received_msg_length;
@@ -916,7 +954,7 @@ void receiveDataPacketFromSerial2() {
         if (received_msg_length == sizeof(incomingData)) {  // got a msg from a sensor
             memcpy(&packet, incomingData, sizeof(packet));
             SentTime++;
-            if(SentTime > 30){SentTime = 0;
+            if(SentTime > 10){SentTime = 0;
             if (MeshConfig.debug) Serial.println("ID: " + String(packet.ID) + " | netId: " + String(packet.netId));
             if (MeshConfig.debug) Serial.println("Data: ");
             
@@ -945,6 +983,13 @@ void receiveDataPacketFromSerial2() {
                 Serial.println(DataLooklinev1.state);
                 Serial.print("Mode: ");
                 Serial.println(DataLooklinev1.Mode);
+                Serial.println("RSSI: " + String(DataLooklinev1.RSSI));
+                Serial.println("Com: " + String(DataLooklinev1.Com));
+                Serial.println("Wifi: " + String(DataLooklinev1.WiFi));
+                Serial.println("Cmd: " + String(DataLooklinev1.Cmd));
+                Serial.println("type: " + String(DataLooklinev1.type));
+                Serial.println("NodeAmount: " + String(DataLooklinev1.Nodecounter));
+                Serial.println("WifiChanel: " + String(MeshConfig.wifiChannel));
             }
             String id = "";
           id += String((DataLooklinev1.nodeID / 1000) % 10);
@@ -1006,7 +1051,7 @@ void receiveDataPacketFromSerial2() {
             }
         }
         }
-    }     
+    }   
 }
 
 void TaskModbus(void *pvParameter)
@@ -1015,7 +1060,6 @@ void TaskModbus(void *pvParameter)
     LOGLN(xPortGetCoreID());
     for (;;)
     {
-
     }
 }
 void TaskWifiMQTT(void *pvParameter)
@@ -1035,8 +1079,10 @@ void TaskWifiMQTT(void *pvParameter)
 //////////////////////////////////////////////////////////////////////////////////////////////////
 void setup()
 {
+    
+    // Khởi tạo EEPROM
+    EEPROM.begin(EEPROM_SIZE);
     Serial.begin(115200);
-    SerialInit();
     #ifndef Gateway
     if (!FileSystem.begin()) {
         if (MeshConfig.debug) Serial.println("Failed to initialize LittleFS. Attempting to format...");
@@ -1052,6 +1098,9 @@ void setup()
         }
     }
     loadConfig();
+        // Tải wifiChanel từ EEPROM
+        MeshConfig.wifiChannel = loadWiFiChannelFromEEPROM();
+
     printConfig();
     pinMode(M0_PIN, OUTPUT);
     pinMode(M1_PIN, OUTPUT);
@@ -1136,10 +1185,12 @@ void setup()
     mainModbusSetting = JSON.parse(mainModbusConfig.loadModbusConfig(MeshConfig.debug, FileSystem));
     #endif//USE_Modbus
     // ModbusLoop();TaskMain
-    // xTaskCreatePinnedToCore(TaskModbus, "TaskModbusRTU", 5000, NULL, 2, NULL, 1);
+    // xTaskCreatePinnedToCore(TaskModbus, "TaskModbusRTU", 1000, NULL, 1, &TskModbus, 1);
     #ifdef USE_Modbus
     xTaskCreatePinnedToCore(TaskWifiMQTT, "TaskMain", 5000, NULL, 1, &TaskMQTT, 1);
     #endif//USE_Modbus
+    SerialInit();
+    
 }
 long timeCount = 0;
 void loop()
@@ -1147,14 +1198,16 @@ void loop()
     #ifdef USE_Modbus
         ModbusLoop(3000);   
     #endif//USE_Modbus
+    
     processSerialInput();// Serial input cmnd processing
     checkConfigButton();// Button Setup
     if(MeshConfig.dataVersion == 3 || MeshConfig.dataVersion == 0){receiveDataPacketFromSerial2();}//Data version3: Send recive data from Serial2 to Mesh
     if(MeshConfig.role == "Broker"){receiveDataPacketFromSerial2();}//Data version3: Send recive data from Serial2 to Mesh
 
     static long ModbusCurrentMillis = millis();
-    if(millis() -  ModbusCurrentMillis >= 3000) {
+    if(millis() -  ModbusCurrentMillis >= 3000) {  
         ModbusCurrentMillis = millis();
+        if(updateFlag){updateFlag = false;saveWiFiChannelToEEPROM(MeshConfig.wifiChannel);delay(3000);ESP.restart();}
         #ifdef USE_Modbus
             if (MeshConfig.debug){
                 LOGLN("Registers Value:");
