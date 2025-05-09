@@ -10,6 +10,10 @@
 #define CONFIG_FILE "/config.json"
 #define MODBUS_FILE "/modbus.json"
 #define MACLIST_FILE "/maclist.json"
+
+extern bool mqttEnable;
+extern String wifiMode;
+
 class WebinterFace{
     public:
         void setupWebConfig();

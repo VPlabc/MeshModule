@@ -200,8 +200,8 @@ String WifiMqttConfig::loadWifiMqttConfig(bool debug, fs::FS &FileSystem) {
         doc["mqttUser"] = "username";
         doc["mqttPass"] = "password";
         doc["wifiMode"] = "STA";
-        doc["ssid"] = "yourSSID";
-        doc["pass"] = "yourPassword";
+        doc["ssid"] = "I-Soft";
+        doc["pass"] = "i-soft@2023";
         doc["conId"] = "b8e54d33-b34a-45ab-b76f-62c8a9abc6c4";
         doc["mqttTopic"] = "test/topic";
         doc["mqttTopicSub"] = "test/topic/sub";
@@ -276,6 +276,8 @@ void connectToWifi() {
           webInterface.setupWebConfig();
           Serial.print("WiFi Channel: ");
           Serial.println(WiFi.channel());
+          xTimerStop(wifiReconnectTimer, 0); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
+          xTimerStart(mqttReconnectTimer, 0);
           break;
       case SYSTEM_EVENT_STA_DISCONNECTED:
           Serial.println("WiFi lost connection");
@@ -283,8 +285,65 @@ void connectToWifi() {
           xTimerStop(mqttReconnectTimer, 0); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
           xTimerStart(wifiReconnectTimer, 0);
           break;
-      }
-  }
+      case SYSTEM_EVENT_ETH_START:
+        LOGLN("ETH Started");
+        // set eth hostname here
+        //ETH.setHostname("iotdevice");
+        break;
+    case SYSTEM_EVENT_ETH_CONNECTED:
+        LOGLN("ETH Connected");
+        break;
+    case SYSTEM_EVENT_ETH_GOT_IP:
+        Serial.print("ETH MAC: ");
+        //Serial.print(ETH.macAddress());
+        Serial.print(", IPv4: ");
+        //Serial.print(ETH.localIP());
+        // if (ETH.fullDuplex())
+        // {
+        //     Serial.print(", FULL_DUPLEX");
+        // }
+        Serial.print(", ");
+        // Serial.print(ETH.linkSpeed());
+        LOGLN("Mbps");
+        //eth_connected = true;
+
+        break;
+        case SYSTEM_EVENT_ETH_DISCONNECTED:
+            LOGLN("ETH Disconnected");
+            //eth_connected = false;
+            break;
+        case SYSTEM_EVENT_ETH_STOP:
+            LOGLN("ETH Stopped");
+            // eth_connected = false;
+            break;
+
+        case SYSTEM_EVENT_STA_CONNECTED:
+            LOGLN("STA Connected");
+            //SocketConnect = true;
+            //xTimerStart(mqttReconnectTimer, 0); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
+
+            // ap_connected = false;SocketConnect = false;
+            break;
+
+        case SYSTEM_EVENT_AP_STADISCONNECTED:
+            LOGLN("AP Disconnected");
+            //ap_connected = false;
+            //SocketConnect = false;
+            break;
+        case SYSTEM_EVENT_AP_STACONNECTED:
+            LOGLN("AP Connected");
+            //ap_connected = true;
+            //SocketConnect = true;
+            break;
+        case SYSTEM_EVENT_AP_START:
+            LOGLN("AP Start");
+            break;
+        case SYSTEM_EVENT_AP_STOP:
+            LOGLN("AP Stop");
+            break;
+
+        } 
+    }
   
 #define RTC_Onl
 #include "RTC_Online.h"
@@ -303,6 +362,7 @@ void connectToWifi() {
     Serial.print("Publishing at QoS 1, packetId: ");
     Serial.println(packetIdPub1);
     mqttIsConnected = true;
+    xTimerStop(mqttReconnectTimer, 0);
   }
   
   void onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
@@ -364,12 +424,37 @@ void connectToWifi() {
             mqttPort = doc["mqttPort"] | 1883;
             mqttUser = doc["mqttUser"] | "username";
             mqttPass = doc["mqttPass"] | "password";
-            wifiMode = doc["wifiMode"] | "STA";
+            wifiMode = doc["wifiMode"] | "AP";
             ssid = doc["ssid"] | "I-Soft";
             pass = doc["pass"] | "i-soft@2023";
             conId = doc["conId"] | "b8e54d33-b34a-45ab-b76f-62c8a9abc6c4";
             mqttTopic = doc["mqttTopic"] | "test/topic";
             mqttTopicSub = doc["mqttTopicSub"] | "test/topic/sub";
+        }
+    }else{
+        Serial.println("wifi_mqtt.json not found.");
+        // Nếu file không tồn tại, tạo file với cấu hình mặc định
+        DynamicJsonDocument doc(1024);
+        doc["mqttEnable"] = true;
+        doc["mqttHost"] = "broker.hivemq.com";
+        doc["mqttPort"] = 1883;
+        doc["mqttUser"] = "username";
+        doc["mqttPass"] = "password";
+        doc["wifiMode"] = "STA";
+        doc["ssid"] = "I-Soft";
+        doc["pass"] = "i-soft@2023";
+        doc["conId"] = "b8e54d33-b34a-45ab-b76f-62c8a9abc6c4";
+        doc["mqttTopic"] = "test/topic";
+        doc["mqttTopicSub"] = "test/topic/sub";
+
+        // Lưu cấu hình mặc định vào file
+        File configFile = LittleFS.open(WIFIMQTT_FILE, "w");
+        if (configFile) {
+            serializeJson(doc, configFile);
+            configFile.close();
+            Serial.println("Default configuration created.");
+        } else {
+            return;
         }
     }
     if(wifiMode == "STA" && mqttEnable){
@@ -394,6 +479,7 @@ void connectToWifi() {
         mqttReconnectTimer = xTimerCreate("mqttTimer", pdMS_TO_TICKS(2000), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToMqtt));
     }
     if(wifiMode == "STA"){
+
         wifiReconnectTimer = xTimerCreate("wifiTimer", pdMS_TO_TICKS(2000), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToWifi));
     }
   
@@ -413,7 +499,14 @@ void connectToWifi() {
 bool once2 = true;
   void WifiMqttConfig::loop(){
     if(once2){once2 = false;Serial.println("MQTT loop.");}
-    if (reconnectAttempts >= 3) {
+    // if (WiFi.status() != WL_CONNECTED && wifiMode == "STA" && mqttEnable) {
+    //     static unsigned long lastAttemptTime = 0;
+    //     if (millis() - lastAttemptTime > 2000) { // Delay 2000ms between connection attempts
+    //         lastAttemptTime = millis();
+    //         connectToWifi();
+    //     }
+    // }
+    if (reconnectAttempts >= 10) {
         Serial.println("Failed to connect to Wi-Fi after 3 attempts. Switching to AP mode.");
         // Cập nhật cấu hình sang chế độ AP
         wifiMode = "AP";

@@ -90,6 +90,10 @@
         <h2>LoRa RY Module Configuration</h2>
         <form id="loraRYConfigForm">
             <div style="margin-bottom: 10px;">
+                <label for="LoRaEnable" style="display: inline-block; width: 150px;">Enable LoRa:</label>
+                <input type="checkbox" id="LoRaEnable" name="LoRaEnable">
+            </div>
+            <div style="margin-bottom: 10px;">
                 <label for="ryMode" style="display: inline-block; width: 150px;">Mode:</label>
                 <select id="ryMode" name="ryMode" style="width: 200px;">
                     <option value="0">Transceiver Mode</option>
@@ -199,6 +203,7 @@
                 //     document.getElementById('ryPower').value = data.power || '';
                 //     document.getElementById('ryAddress').value = data.address || '';
                 //     document.getElementById('ryNetworkId').value = data.networkId || '';
+                    // document.getElementById('LoRaEnable').checked = data.LoRaEnable || false;
                 // })
                 // .catch(error => console.error('Error loading LoRa RY config:', error));
         }
@@ -207,6 +212,7 @@
         function submitLoRaRYConfig() {
             const form = document.getElementById('loraRYConfigForm');
             const loraRYConfig = {
+                LoRaEnable: document.getElementById('LoRaEnable').checked,
                 mode: parseInt(form.ryMode.value),
                 rxTime: parseInt(form.ryRxTime.value),
                 lowSpeedTime: parseInt(form.ryLowSpeedTime.value),
@@ -232,6 +238,7 @@
             })
             .catch(error => console.error('Error submitting LoRa RY config:', error));
         }
+        
         function submitLoRaConfig() {
             const form = document.getElementById('loraConfigForm');
             const loraConfig = {

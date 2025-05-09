@@ -41,7 +41,43 @@ String ModbusConfig::loadModbusConfig(bool debug, fs::FS &FileSystem) {
     String jsonString;
     if (!FileSystem.exists(MODBUS_FILE)) {
         if (debug) Serial.println("modbus.json not found.");
-        return "modbus.json not found.";
+        
+        // Nếu file không tồn tại, tạo file với cấu hình mặc định
+        DynamicJsonDocument doc(1024);
+        doc["Modbus"] = "Config";
+        doc["role"] = "slave";
+        doc["Com"] = "TCP/IP";
+        doc["id"] = 255;
+        JsonArray slaveip = doc.createNestedArray("slaveip");
+        slaveip.add(192);
+        slaveip.add(168);
+        slaveip.add(3);
+        slaveip.add(251);
+        doc["conId"] = "b8e54d33-b34a-45ab-b76f-62c8a9abc6c4";
+        JsonArray tags = doc.createNestedArray("Tag");
+        tags.add(1101);
+        tags.add(1102);
+        tags.add(1103);
+        JsonArray values = doc.createNestedArray("Value");
+        values.add(164);
+        values.add(166);
+        values.add(32);
+        JsonArray types = doc.createNestedArray("Type");
+        types.add(2);
+        types.add(2);
+        types.add(0);
+        // Lưu cấu hình mặc định vào file
+        File configFile = FileSystem.open(MODBUS_FILE, "w");
+        if (configFile) {
+            serializeJson(doc, configFile);
+            configFile.close();
+            Serial.println("Default configuration created.");
+        } else {
+            return "Failed to create default config";
+        }
+        // Trả về cấu hình mặc định
+        serializeJson(doc, jsonString);
+        return jsonString;
     }
     else{
         File file = FileSystem.open(MODBUS_FILE, "r");

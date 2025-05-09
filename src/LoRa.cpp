@@ -435,7 +435,7 @@ void sendData(String address, String data) {
   Serial.print("Sent: ");
   Serial.println(cmd);
   unsigned long startTime = millis();
-  while (millis() - startTime < 500) {
+  while (millis() - startTime < 100) {
     if (loraSerial.available()) {
     String response = loraSerial.readStringUntil('\n');
     Serial.print("Response: ");

@@ -1,6 +1,8 @@
 // #include <Arduino.h>
 // #include "config.h"
 #include "Modbus_RTU.h"
+DFRobot_RTU Modbus_Master;
+
 // #include "./HardwareSerial.h"
 #define RTU_RS485
 #define EN_DEBUG
@@ -21,7 +23,7 @@ Modbus_Prog ModbuS;
 #define DB_LN(...)
 #endif
 
-// #define ESP32_C3
+#define ESP32_C3
 
 #if defined(ESP32_C3)
 #define Modbus_Serial Serial1
@@ -39,28 +41,14 @@ TaskHandle_t Task1;
 
 #define D0 0      //Holding register Address 0  Hunidity
 #define D1 1      //Holding register Address 1  Temperature
-#define D2 2      
-#define D3 3       
+#define D2 170      
+#define D3 172       
 boolean coils[50] = {false};
+boolean inputCoils[50] = {false};
 uint16_t holdingRegisters[200] = {0};
 uint16_t inputRegisters[200] = {0};
 
 
-//Task1 :
-void Task1code( void * pvParameters ) {
-  Serial.print("Task1 running on core ");
-  Serial.println(xPortGetCoreID());
-
-  for (;;) {
-    int randomNumber1 = random(0, 800);
-    //Serial.print("randomNumber1  "); Serial.println(randomNumber1);
-    mb.Hreg (D2, randomNumber1);
-    int randomNumber2 = random(-400, 600);
-    //Serial.print("randomNumber2  "); Serial.println(randomNumber2);
-    mb.Hreg(D3, randomNumber2 );
-    delay(5000);
-  }//End loop
-}
 
 
 // #define DEBUG
@@ -69,7 +57,6 @@ unsigned long previousMillis_ = 0;
 bool Done = false;
 
 byte MBRole = MBslave;
-
 void debugs();
 #define dataSize 10
 #if defined(PLC_OEE) || defined(RFData)
@@ -108,22 +95,10 @@ unsigned long previousMillis_update = 0;
 #define SerialPort
 #define TEST
 
-#define ledPin 2 // onboard led 
-
-void Modbus_Prog::modbus_write_setParameter(int pos, int Value, int cmd) {
-  // if(pos == HOLDING_REGS_SIZE+1 && Value == 0 && cmd == 0){ModbuS.regs_WRITE[CMD] = 2;}
-  // else{ ModbuS.regs_WRITE[pos] = Value;ModbuS.regs_WRITE[cmd] = cmd;debugs();}
-
-}
-
-#define SLAVE_ID 1
-
-/// @brief /// Register address
-// bool ModbusRole = Master;
-
 void debugs();
 uint16_t HoldregGet (TRegister* reg, uint16_t val0);
 uint16_t CoilGet(TRegister* reg, uint16_t val0);
+
 // HardwareSerial1 MySerial1_(1);
 // #define Serial2 MySerial1_
 
@@ -134,6 +109,51 @@ JSONVar iMagSetting;
 extern String connId[4];
 extern String Tag[40];
 extern int AddrOffset;
+
+//Task1 :
+void Task1code( void * pvParameters ) {
+  Serial.print("Task1 running on core ");
+  Serial.println(xPortGetCoreID());
+
+  for (;;) {
+    if (MBRole == MBmaster) {
+      
+      for (int i = 0; i < (int)iMagSetting["Value"].length(); i++) {
+        if((int)iMagSetting["Type"][i] == 0){
+          Modbus_Master.writeCoilsRegister((int)iMagSetting["id"], (uint16_t)iMagSetting["Value"][i],inputCoils[(uint16_t)iMagSetting["Value"][i]]); //Read holdingRegisters
+        }
+        if((int)iMagSetting["Type"][i] == 1){
+          Modbus_Master.writeHoldingRegister((int)iMagSetting["id"], (uint16_t)iMagSetting["Value"][i],inputRegisters[(uint16_t)iMagSetting["Value"][i]]); //write inputRegisters`
+        }
+        if((int)iMagSetting["Type"][i] == 2){
+          Modbus_Master.writeHoldingRegister((int)iMagSetting["id"], (uint16_t)iMagSetting["Value"][i],inputRegisters[(uint16_t)iMagSetting["Value"][i]]); //write inputRegisters
+          Modbus_Master.writeHoldingRegister((int)iMagSetting["id"], (uint16_t)iMagSetting["Value"][i]+1,inputRegisters[((uint16_t)iMagSetting["Value"][i])+1]); //write inputRegisters
+        }
+        if((int)iMagSetting["Type"][i] == 3){
+          Modbus_Master.writeHoldingRegister((int)iMagSetting["id"], (uint16_t)iMagSetting["Value"][i], inputRegisters[(uint16_t)iMagSetting["Value"][i]]); //write inputRegisters
+          Modbus_Master.writeHoldingRegister((int)iMagSetting["id"], (uint16_t)iMagSetting["Value"][i]+1, inputRegisters[((uint16_t)iMagSetting["Value"][i])+1]); //write inputRegisters
+        }
+      }
+    }
+    if (MBRole == MBslave) {
+    int randomNumber1 = random(0, 800);
+    //Serial.print("randomNumber1  "); Serial.println(randomNumber1);
+    mb.Hreg (D2, randomNumber1);
+    int randomNumber2 = random(0, 65000);
+    //Serial.print("randomNumber2  "); Serial.println(randomNumber2);
+    mb.Hreg(D3, randomNumber2 );
+    }
+    delay(5000);
+  }//End loop
+}
+
+
+void Modbus_Prog::modbus_write_setParameter(int pos, int Value, int cmd) {
+  // if(pos == HOLDING_REGS_SIZE+1 && Value == 0 && cmd == 0){ModbuS.regs_WRITE[CMD] = 2;}
+  // else{ ModbuS.regs_WRITE[pos] = Value;ModbuS.regs_WRITE[cmd] = cmd;debugs();}
+
+}
+
 
 void Modbus_Prog::modbus_setup(String ModbusParameter, int8_t RXpin, int8_t TXpin) {
   #ifdef RTU_RS485
@@ -164,28 +184,28 @@ void Modbus_Prog::modbus_setup(String ModbusParameter, int8_t RXpin, int8_t TXpi
     
     }
     
-      if(String((const char*)iMagSetting["role"]) == "master"){MBRole = MBmaster;} else {MBRole = MBslave;}
+    if(String((const char*)iMagSetting["role"]) == "master"){MBRole = MBmaster;} else {MBRole = MBslave;}
           Serial.println("Modbus :" + String((const char*)iMagSetting["role"]));
-
+    if(String((const char*)iMagSetting["Com"]) == "RS485"){
       DB_LN("_________________________________________ MODBUS RTU ________________________________________");
       
       //   initupdate();
         if (MBRole == MBmaster) {
           DB_LN("Modbus Master Init");
-          Serial2.begin(9600, SERIAL_8N1, RXpin ,TXpin); // RX, TX
+          Modbus_Serial.begin(9600, SERIAL_8N1, RXpin ,TXpin); // RX, TX
           Modbus_Master.setTimeoutTimeMs(100);
-          Modbus_Master.begin(&Serial2);
+          Modbus_Master.begin(&Modbus_Serial);
         }
         if (MBRole == MBslave) {
           DB_LN("Modbus Slave Init");
-          Serial2.begin(9600, SERIAL_8N1);
+          Modbus_Serial.begin(9600, SERIAL_8N1);
           
           #if defined(ESP32) || defined(ESP8266)
-            mb.begin(&Serial2);
+            mb.begin(&Modbus_Serial);
             mb.server((int)iMagSetting["id"]);
           #else
-            // mb.begin(&Serial);
-            mb.begin(&Serial2, RXD2, TXD2); //or use RX/TX direction control pin (if required)
+            // mb.begin(&Modbus_Serial);
+            mb.begin(&Modbus_Serial, RXD2, TXD2); //or use RX/TX direction control pin (if required)
             //mb.setBaudrate(9600);
             mb.setBaudrate(BUAD_RATE);     //กำหนด buadrate จาก ตัวแปล BUAD_RATE
           #endif
@@ -224,10 +244,9 @@ void Modbus_Prog::modbus_setup(String ModbusParameter, int8_t RXpin, int8_t TXpi
               mb.onGetHreg((int)iMagSetting["Value"][i]+1, HoldregGet);
             }
           }
-
-
         }
         DB_LN("________________________________________________________________________________________");
+      }
 #endif//RTU_RS485
 }
 
@@ -253,6 +272,13 @@ uint16_t Modbus_Prog::GetHoldingReg(uint16_t addr) {
 boolean Modbus_Prog::GetCoilReg(uint16_t addr) {
   return coils[addr];
 }
+void Modbus_Prog::SetCoilReg(uint16_t addr,boolean value) {
+  inputCoils[addr] = value;
+}
+void Modbus_Prog::SetHoldingReg(uint16_t addr,uint16_t value) {
+  holdingRegisters[addr] = value;
+}
+
 uint16_t HoldregGet (TRegister* reg, uint16_t val0) {
   holdingRegisters[reg->address.address] = val0;
   // Serial.println("HregGet "+ String(reg->address.address) + " val:" + String(holdingRegisters[reg->address.address]));
@@ -288,43 +314,40 @@ void Modbus_Prog::MonitorData(){
     DB_LN("");
 }
 void Modbus_Prog::modbus_loop(int Timeout) {
-  
-  if (millis() - previousMillis_ >= Timeout) {
-    previousMillis_ = millis();
-    if (Done == false) {
-      Done = true;
-      DB_LN("Modbus Loop");
-    }
-    if (MBRole == MBmaster) {
-      for (int i = 0; i < (int)iMagSetting["Value"].length(); i++) {
-        
-        if((int)iMagSetting["Type"][i] == 0){
-          coils[i] = Modbus_Master.readCoilsRegister((int)iMagSetting["id"], (int)iMagSetting["Value"][i]); //Read holdingRegisters
+  if(String((const char*)iMagSetting["Com"]) == "RS485"){
+    if (millis() - previousMillis_ >= Timeout) {
+      previousMillis_ = millis();
+      if (Done == false) {
+        Done = true;
+        DB_LN("Modbus Loop");
+      }
+      if (MBRole == MBmaster) {
+        for (int i = 0; i < (int)iMagSetting["Value"].length(); i++) {
+          
+          if((int)iMagSetting["Type"][i] == 0){
+            coils[(int)iMagSetting["Value"][i]] = Modbus_Master.readCoilsRegister((int)iMagSetting["id"], (int)iMagSetting["Value"][i]); //Read holdingRegisters
+          }
+          if((int)iMagSetting["Type"][i] == 1){
+            holdingRegisters[(int)iMagSetting["Value"][i]] = Modbus_Master.readHoldingRegister((int)iMagSetting["id"], (int)iMagSetting["Value"][i]); //Read holdingRegisters
+          }
+          if((int)iMagSetting["Type"][i] == 2){
+            holdingRegisters[(int)iMagSetting["Value"][i]] = Modbus_Master.readHoldingRegister((int)iMagSetting["id"], (int)iMagSetting["Value"][i]); //Read holdingRegisters
+            holdingRegisters[((int)iMagSetting["Value"][i])+1] = Modbus_Master.readHoldingRegister((int)iMagSetting["id"], (int)iMagSetting["Value"][i]+1); //Read holdingRegisters
+          }
+          if((int)iMagSetting["Type"][i] == 3){
+            holdingRegisters[(int)iMagSetting["Value"][i]] = Modbus_Master.readHoldingRegister((int)iMagSetting["id"], (int)iMagSetting["Value"][i]); //Read holdingRegisters
+            holdingRegisters[((int)iMagSetting["Value"][i])+1] = Modbus_Master.readHoldingRegister((int)iMagSetting["id"], (int)iMagSetting["Value"][i]+1); //Read holdingRegisters
+          }
         }
-        if((int)iMagSetting["Type"][i] == 1){
-          holdingRegisters[i*2] = Modbus_Master.readHoldingRegister((int)iMagSetting["id"], (int)iMagSetting["Value"][i]); //Read holdingRegisters
-        }
-        if((int)iMagSetting["Type"][i] == 2){
-          holdingRegisters[i*2] = Modbus_Master.readHoldingRegister((int)iMagSetting["id"], (int)iMagSetting["Value"][i]); //Read holdingRegisters
-          holdingRegisters[(i*2)+1] = Modbus_Master.readHoldingRegister((int)iMagSetting["id"], (int)iMagSetting["Value"][i]+1); //Read holdingRegisters
-        }
-        if((int)iMagSetting["Type"][i] == 3){
-          holdingRegisters[i*2] = Modbus_Master.readHoldingRegister((int)iMagSetting["id"], (int)iMagSetting["Value"][i]); //Read holdingRegisters
-          holdingRegisters[(i*2)+1] = Modbus_Master.readHoldingRegister((int)iMagSetting["id"], (int)iMagSetting["Value"][i]+1); //Read holdingRegisters
-        }
+        MonitorData();
       }
       // MonitorData();
     }
-
-
-    // MonitorData();
-    
+    // #ifdef MASTER_MODBUS
+      if (MBRole == MBslave) {
+        mb.task();
+        yield();delay(10);
+      }
+      yield();
   }
-  // #ifdef MASTER_MODBUS
- 
-    if (MBRole == MBslave) {
-      mb.task();
-      yield();delay(10);
-    }
-    yield();
 }//loop

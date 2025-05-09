@@ -55,6 +55,8 @@
 #define CONFIG_FILE "/config.json"
 #define MACLIST_FILE "/maclist.json"
 
+#include <ETH.h>
+
 extern int8_t BUZZ;
 extern int8_t SETUP_BUTTON;
 extern int8_t LED_STT;
@@ -68,6 +70,7 @@ extern int8_t InPut0;
 extern int8_t InPut1;
 extern int8_t InPut2;
 extern int8_t InPut3;
+extern int8_t InPut4;
 extern int8_t Ser_1RX;
 extern int8_t Ser_1TX;
 extern int8_t M0_PIN;
@@ -79,7 +82,7 @@ extern int8_t Ser_2RX;
 extern int8_t Ser_2TX;
 
 
-#ifdef Module_10O4I
+// #ifdef Module_10O4I
 // #include "Adafruit_MCP23008.h"
 #define ETH_ADDR 1
 #define ETH_POWER_PIN -1 // Do not use it, it can cause conflict during the software reset.
@@ -88,7 +91,7 @@ extern int8_t Ser_2TX;
 
 
 
-#endif// Module 10O4I
+// #endif// Module 10O4I
 #define Se_BAUD_RATE 115200
 // #define MY_ROLE         ESP_NOW_ROLE_COMBO              // set the role of this device: CONTROLLER, SLAVE, COMBO
 // #define RECEIVER_ROLE   ESP_NOW_ROLE_COMBO              // set the role of the receiver

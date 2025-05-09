@@ -14,9 +14,9 @@ String mqttUser = "username";
 String mqttPass = "password";
 bool mqttEnable = true;
 
-String wifiMode = "STA";
-String ssid = "yourSSID";
-String pass = "yourPassword";
+String wifiMode = "AP";
+String ssid = "I-Soft";
+String pass = "i-soft@2023";
 String conId = "b8e54d33-b34a-45ab-b76f-62c8a9abc6c4";
 String mqttTopicStat = "iSoftMesh/Status";
 String mqttTopic = "iSoftMesh/data";
@@ -36,51 +36,6 @@ class CaptiveRequestHandler : public AsyncWebHandler {
         bool canHandle(AsyncWebServerRequest *request){
         //request->addInterestingHeader("ANY");
         return true;
-        }
-
-        void handleRequest(AsyncWebServerRequest *request) {
-            AsyncResponseStream *response = request->beginResponseStream("text/html");
-            response->print("<!DOCTYPE html><html><head><title>Captive Portal</title></head><style>");
-            response->print("body { font-family: Arial, sans-serif; margin: 20px; }");
-            response->print("h1 { color: #333; }");
-            response->print("button { margin-top: 10px; padding: 10px; background-color: #4CAF50; color: white; border: none; cursor: pointer; }");
-            response->print("button:hover { background-color: #45a049; }");
-            response->print("table { width: 100%; border-collapse: collapse; margin-top: 20px; }");
-            response->print("th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }");
-            response->print("th { background-color: #f2f2f2; }");
-            response->print("tr:hover { background-color: #f5f5f5; }");
-            response->print("td button { background-color: #f44336; color: white; border: none; cursor: pointer; padding: 5px 10px; }");
-            response->print("td button:hover { background-color: #d32f2f; }");
-            response->print("</style></head><body><CENTER>");
-            response->print("<h1>Captive Portal</h1>");
-            response->print("<h2>File Manager</h2>");
-            response->print("<table><thead><tr><th>File Name</th><th>Action</th></tr></thead>");
-            response->print("<tbody id=\"fileList\"></tbody></table>");
-            response->print("<div><h3>Upload File</h3>");
-            response->print("<input type='file' id='fileInput'><button onclick='uploadFile()'>Upload</button></div></CENTER>");
-            response->print("<script>");
-            response->print("function fetchFileList() {");
-            response->print("fetch('/list-files').then(response => response.json()).then(files => {");
-            response->print("const fileList = document.getElementById('fileList'); fileList.innerHTML = '';");
-            response->print("files.forEach(file => {");
-            response->print("const row = document.createElement('tr');");
-            response->print("const fileNameCell = document.createElement('td'); fileNameCell.textContent = file;");
-            response->print("const actionCell = document.createElement('td');");
-            response->print("const deleteButton = document.createElement('button'); deleteButton.textContent = 'Delete';");
-            response->print("deleteButton.onclick = () => deleteFile(file); actionCell.appendChild(deleteButton);");
-            response->print("row.appendChild(fileNameCell); row.appendChild(actionCell); fileList.appendChild(row); }); }); }");
-            response->print("function uploadFile() {");
-            response->print("const fileInput = document.getElementById('fileInput'); const file = fileInput.files[0];");
-            response->print("if (!file) { alert('Please select a file to upload.'); return; }");
-            response->print("const formData = new FormData(); formData.append('file', file);");
-            response->print("fetch('/upload', { method: 'POST', body: formData }).then(response => {");
-            response->print("if (response.ok) { alert('File uploaded successfully.'); fetchFileList(); } else { alert('Failed to upload file.'); } }); }");
-            response->print("function deleteFile(fileName) {");
-            response->print("fetch(`/delete?file=${encodeURIComponent(fileName)}`, { method: 'DELETE' }).then(response => {");
-            response->print("if (response.ok) { alert('File deleted successfully.'); fetchFileList(); } else { alert('Failed to delete file.'); } }); }");
-            response->print("fetchFileList();");
-            response->print("</script></body></html>");
-            request->send(response);
         }
 };
 
@@ -391,7 +346,50 @@ server.on("/save-wifi-mqtt-config", HTTP_POST, [](AsyncWebServerRequest *request
             request->send(400, "text/plain", "File parameter missing");
         }
     });
-
+    server.on("/tool", HTTP_GET, [](AsyncWebServerRequest *request) {
+        AsyncResponseStream *response = request->beginResponseStream("text/html");
+        response->print("<!DOCTYPE html><html><head><title>Captive Portal</title></head><style>");
+        response->print("body { font-family: Arial, sans-serif; margin: 20px; }");
+        response->print("h1 { color: #333; }");
+        response->print("button { margin-top: 10px; padding: 10px; background-color: #4CAF50; color: white; border: none; cursor: pointer; }");
+        response->print("button:hover { background-color: #45a049; }");
+        response->print("table { width: 100%; border-collapse: collapse; margin-top: 20px; }");
+        response->print("th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }");
+        response->print("th { background-color: #f2f2f2; }");
+        response->print("tr:hover { background-color: #f5f5f5; }");
+        response->print("td button { background-color: #f44336; color: white; border: none; cursor: pointer; padding: 5px 10px; }");
+        response->print("td button:hover { background-color: #d32f2f; }");
+        response->print("</style></head><body><CENTER>");
+        response->print("<h1>Captive Portal</h1>");
+        response->print("<h2>File Manager</h2>");
+        response->print("<table><thead><tr><th>File Name</th><th>Action</th></tr></thead>");
+        response->print("<tbody id=\"fileList\"></tbody></table>");
+        response->print("<div><h3>Upload File</h3>");
+        response->print("<input type='file' id='fileInput'><button onclick='uploadFile()'>Upload</button></div></CENTER>");
+        response->print("<script>");
+        response->print("function fetchFileList() {");
+        response->print("fetch('/list-files').then(response => response.json()).then(files => {");
+        response->print("const fileList = document.getElementById('fileList'); fileList.innerHTML = '';");
+        response->print("files.forEach(file => {");
+        response->print("const row = document.createElement('tr');");
+        response->print("const fileNameCell = document.createElement('td'); fileNameCell.textContent = file;");
+        response->print("const actionCell = document.createElement('td');");
+        response->print("const deleteButton = document.createElement('button'); deleteButton.textContent = 'Delete';");
+        response->print("deleteButton.onclick = () => deleteFile(file); actionCell.appendChild(deleteButton);");
+        response->print("row.appendChild(fileNameCell); row.appendChild(actionCell); fileList.appendChild(row); }); }); }");
+        response->print("function uploadFile() {");
+        response->print("const fileInput = document.getElementById('fileInput'); const file = fileInput.files[0];");
+        response->print("if (!file) { alert('Please select a file to upload.'); return; }");
+        response->print("const formData = new FormData(); formData.append('file', file);");
+        response->print("fetch('/upload', { method: 'POST', body: formData }).then(response => {");
+        response->print("if (response.ok) { alert('File uploaded successfully.'); fetchFileList(); } else { alert('Failed to upload file.'); } }); }");
+        response->print("function deleteFile(fileName) {");
+        response->print("fetch(`/delete?file=${encodeURIComponent(fileName)}`, { method: 'DELETE' }).then(response => {");
+        response->print("if (response.ok) { alert('File deleted successfully.'); fetchFileList(); } else { alert('Failed to delete file.'); } }); }");
+        response->print("fetchFileList();");
+        response->print("</script></body></html>");
+        request->send(response);
+    });
     server.on("/index.html", HTTP_GET, [](AsyncWebServerRequest *request){
         request->send(LittleFS, "/index.html", String(), false, processors);
         // connectClinent = true;

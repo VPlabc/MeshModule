@@ -67,7 +67,6 @@ class Modbus_Prog
 public:
 bool isConnect;
 bool MB_connect = false;
-DFRobot_RTU Modbus_Master;
 // ModbusRTU mb;
 const uint16_t RegRead = 0; //Register Read
 //////////////// registers of your slave ///////////////////
@@ -110,6 +109,9 @@ bool getStart();
 void MonitorData();
 uint32_t DWORD(uint16_t u1, uint16_t u2);
 uint16_t GetHoldingReg(uint16_t addr);
+void SetCoilReg(uint16_t addr,boolean value);
+void SetHoldingReg(uint16_t addr,uint16_t value);
+
 bool GetCoilReg(uint16_t addr);
 void modbus_setup(String ModbusParameter, int8_t RXpin, int8_t TXpin) ;
 void modbus_loop(int Timeout);
