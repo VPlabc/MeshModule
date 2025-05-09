@@ -221,12 +221,19 @@ void SerialInit() {
     #ifdef USE_SERIAL2
     
     Serial2.begin(Se_BAUD_RATE, SERIAL_8N1, 16, 17);
-    Serial2.println("Serial2 initialized.");
+    Serial.println("Serial TTL initialized.");
     // Serial2.begin(Se_BAUD_RATE, SERIAL_8N1, Se_dRX_PIN, Se_TX_PIN);
     // Serial2.println("Serial2 initialized.");
     #endif//USE_SERIAL2
 }
-
+void resetWiFiProtocolToDefault() {
+    esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N); // Set protocol to default (802.11b/g/n)
+    Serial.println("WiFi protocol reset to default (802.11b/g/n).");
+}
+void resetWiFiApProtocolToDefault() {
+    esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G); // Set protocol to default (802.11b/g)
+    Serial.println("WiFi protocol reset to default (802.11b/g).");
+}
 void formatMacAddress(const uint8_t *macAddr, char *buffer, int maxLength)
 {
   snprintf(buffer, maxLength, "%02x:%02x:%02x:%02x:%02x:%02x", macAddr[0], macAddr[1], macAddr[2], macAddr[3], macAddr[4], macAddr[5]);
@@ -549,21 +556,28 @@ void saveMacToMacList(const uint8_t *macAddr, int id) {
     }
 }
 
+unsigned long successCount = 0;
+unsigned long totalCount = 0;
+unsigned long lastCheckTime = 0;
 
-
-
+void calculateSuccessRate() {
+    float successRate = (totalCount > 0) ? (float(successCount) / totalCount) * 100 : 0;
+    Serial.println("Realtime Message Success Rate: " + String(successRate) + "%");
+}
 
 #ifdef ESP32
-// callback when data is sent
-void sentCallback(const uint8_t *macAddr, esp_now_send_status_t status)
-{
-    // char macStr[18];
-    // formatMacAddress(macAddr, macStr, 18);
-    // Serial.print("Last Packet Sent to: ");
-    // Serial.println(macStr);
-    if (MeshConfig.debug) Serial.print("Last Packet Send Status: ");
-    if (MeshConfig.debug) Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
+void sentCallback(const uint8_t *macAddr, esp_now_send_status_t status) {
+    totalCount++;
+    if (status == ESP_NOW_SEND_SUCCESS) {
+        successCount++;
+    }
+    if (MeshConfig.debug) {
+        Serial.print("Last Packet Send Status: ");
+        Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
+    }
+    calculateSuccessRate();
 }
+
 #ifdef ESP32_RISCV
 void receiveCallback(const esp_now_recv_info *recvInfo, const uint8_t *data, int dataLen) {
     char macStr[18];
@@ -778,6 +792,7 @@ unsigned long buttonPressTime = 0;
 void startConfigPortal() {
     // WiFi.onEvent(WiFiEvent);
     // Set up the access point for configuration mode
+    
     #ifdef USE_Modbus
     if(wifiMode == "AP"){ 
     #endif//USE_Modbus
@@ -785,6 +800,10 @@ void startConfigPortal() {
         WiFi.disconnect();
         WiFi.mode(WIFI_OFF);
         dnsServer.stop();
+        
+        esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G); // Đặt giao thức WiFi
+        esp_wifi_set_ps(WIFI_PS_NONE); // Tắt chế độ tiết kiệm năng lượng
+
         if (MeshConfig.debug) Serial.println("Starting configuration portal...");
         WiFi.mode(WIFI_AP);
         WiFi.softAPConfig(apIP, apIP, subnet);
@@ -817,86 +836,6 @@ void checkConfigButton() {
     }
 }
 
-// void WiFiEvent(WiFiEvent_t event)
-// {
-//     switch (event)
-//     {
-//     case SYSTEM_EVENT_ETH_START:
-//         LOGLN("ETH Started");
-//         // set eth hostname here
-//         //ETH.setHostname("iotdevice");
-//         break;
-//     case SYSTEM_EVENT_ETH_CONNECTED:
-//         LOGLN("ETH Connected");
-//         break;
-//     case SYSTEM_EVENT_ETH_GOT_IP:
-//         Serial.print("ETH MAC: ");
-//         //Serial.print(ETH.macAddress());
-//         Serial.print(", IPv4: ");
-//         //Serial.print(ETH.localIP());
-//         // if (ETH.fullDuplex())
-//         // {
-//         //     Serial.print(", FULL_DUPLEX");
-//         // }
-//         Serial.print(", ");
-//         // Serial.print(ETH.linkSpeed());
-//         LOGLN("Mbps");
-//         //eth_connected = true;
-
-//         break;
-//     case SYSTEM_EVENT_ETH_DISCONNECTED:
-//         LOGLN("ETH Disconnected");
-//         //eth_connected = false;
-//         break;
-//     case SYSTEM_EVENT_ETH_STOP:
-//         LOGLN("ETH Stopped");
-//         // eth_connected = false;
-//         break;
-
-//     case SYSTEM_EVENT_STA_CONNECTED:
-//         LOGLN("STA Connected");
-//         //SocketConnect = true;
-//         //xTimerStart(mqttReconnectTimer, 0); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
-
-//         // ap_connected = false;SocketConnect = false;
-//         break;
-
-//     case SYSTEM_EVENT_STA_DISCONNECTED:
-//         LOGLN("STA Disconnected");
-//         // WiFi.disconnect();
-//         // WiFi.mode(WIFI_OFF);
-//         // WiFi.mode(WIFI_STA);
-//         //vTaskResume(TskWIFI);
-//         //xTimerStop(mqttReconnectTimer, 0); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
-//         //ap_connected = false;
-//         //SocketConnect = false;//ReconnectWifi = true;
-//         break;
-//     case SYSTEM_EVENT_AP_STADISCONNECTED:
-//         LOGLN("AP Disconnected");
-//         //ap_connected = false;
-//         //SocketConnect = false;
-//         break;
-//     case SYSTEM_EVENT_AP_STACONNECTED:
-//         LOGLN("AP Connected");
-//         //ap_connected = true;
-//         //SocketConnect = true;
-//         break;
-//     case SYSTEM_EVENT_AP_START:
-//         LOGLN("AP Start");
-//         break;
-//     case SYSTEM_EVENT_AP_STOP:
-//         LOGLN("AP Stop");
-//         break;
-//     case SYSTEM_EVENT_STA_GOT_IP:
-//         Serial.println("WiFi connected");
-//         Serial.println("IP address: ");
-//         Serial.println(WiFi.localIP());
-//         // connectToMqtt();
-//     break;
-//     default:
-//         break;
-//     }
-// }
 ///////////////////////////////////////////////////////// Serial TTL -> Mesh /////////////////////////////////////////////////////
 void convertPacketToDataLookline(const uint8_t *data, struct_Parameter_messageOld &DataLookline) {
     // Chuyển đổi dữ liệu từ packet.data sang DataLookline
@@ -955,101 +894,108 @@ void receiveDataPacketFromSerial2() {
             memcpy(&packet, incomingData, sizeof(packet));
             SentTime++;
             if(SentTime > 10){SentTime = 0;
-            if (MeshConfig.debug) Serial.println("ID: " + String(packet.ID) + " | netId: " + String(packet.netId));
-            if (MeshConfig.debug) Serial.println("Data: ");
-            
-            esp_now_peer_info_t peerInfo = {};
-            memcpy(&peerInfo.peer_addr, MeshConfig.BrokerAddress, 6);
-            if (!esp_now_is_peer_exist(MeshConfig.BrokerAddress)) {
-                peerInfo.channel = MeshConfig.wifiChannel;
-                esp_now_add_peer(&peerInfo);
-            }
-                // Giả sử packet chứa dữ liệu
-                // convertPacketToDataLookline(packet.data, DataLookline);
-                convertPacketToDataLooklinev1(packet.data, DataLooklinev1);
+                if (MeshConfig.debug) Serial.println("ID: " + String(packet.ID) + " | netId: " + String(packet.netId));
+                if (MeshConfig.debug) Serial.println("Data: ");
                 
-            if(MeshConfig.debug) {
-                // In ra dữ liệu đã chuyển đổi
-                Serial.println("DataLookline:");
-                Serial.print("Network ID: ");
-                Serial.println(DataLooklinev1.networkID);
-                Serial.print("Node ID: ");
-                Serial.println(DataLooklinev1.nodeID);
-                Serial.print("PLAN: ");
-                Serial.println(DataLooklinev1.PLAN);
-                Serial.print("RESULT: ");
-                Serial.println(DataLooklinev1.RESULT);
-                Serial.print("State: ");
-                Serial.println(DataLooklinev1.state);
-                Serial.print("Mode: ");
-                Serial.println(DataLooklinev1.Mode);
-                Serial.println("RSSI: " + String(DataLooklinev1.RSSI));
-                Serial.println("Com: " + String(DataLooklinev1.Com));
-                Serial.println("Wifi: " + String(DataLooklinev1.WiFi));
-                Serial.println("Cmd: " + String(DataLooklinev1.Cmd));
-                Serial.println("type: " + String(DataLooklinev1.type));
-                Serial.println("NodeAmount: " + String(DataLooklinev1.Nodecounter));
-                Serial.println("WifiChanel: " + String(MeshConfig.wifiChannel));
-            }
-            String id = "";
-          id += String((DataLooklinev1.nodeID / 1000) % 10);
-          id += String((DataLooklinev1.nodeID / 100) % 10);
-          id += String((DataLooklinev1.nodeID / 10) % 10);
-          id += String((DataLooklinev1.nodeID / 1) % 10);
-          String networkID = "";
-            networkID += String((DataLooklinev1.networkID / 1000) % 10);
-            networkID += String((DataLooklinev1.networkID / 100) % 10);
-            networkID += String((DataLooklinev1.networkID / 10) % 10);
-            networkID += String((DataLooklinev1.networkID / 1) % 10);
-
-          String StringPlan = "";
-          StringPlan += (DataLooklinev1.PLAN / 1000) % 10;
-          StringPlan += (DataLooklinev1.PLAN / 100) % 10;
-          StringPlan += (DataLooklinev1.PLAN / 10) % 10;
-          StringPlan += (DataLooklinev1.PLAN / 1) % 10;
-
-          String StringResult = "";
-          StringResult += (DataLooklinev1.RESULT / 1000) % 10;
-          StringResult += (DataLooklinev1.RESULT / 100) % 10;
-          StringResult += (DataLooklinev1.RESULT / 10) % 10;
-          StringResult += (DataLooklinev1.RESULT / 1) % 10;
-          String State = "";
-          if(DataLooklinev1.state){State ="1" + String(DataLooklinev1.Mode);}else{State = "0" + String(DataLooklinev1.Mode);}
-          String sentData = id + networkID + "04" + "18" + StringPlan + StringResult + State;
-          esp_err_t result;
-
-                if(MeshConfig.dataVersion == 3){  result = esp_now_send(MeshConfig.BrokerAddress, (uint8_t *) &DataLooklinev1, sizeof(DataLooklinev1));}
-                if(MeshConfig.dataVersion == 0){  
-                    result = esp_now_send(MeshConfig.BrokerAddress, (uint8_t *)&DataLooklinev1, sizeof(DataLooklinev1));
+                esp_now_peer_info_t peerInfo = {};
+                memcpy(&peerInfo.peer_addr, MeshConfig.BrokerAddress, 6);
+                if (!esp_now_is_peer_exist(MeshConfig.BrokerAddress)) {
+                    peerInfo.channel = MeshConfig.wifiChannel;
+                    esp_now_add_peer(&peerInfo);
                 }
-            
-            if (result == ESP_OK)
-            {
-                if (MeshConfig.debug) Serial.println("DataPacket sent success");
+                    // Giả sử packet chứa dữ liệu
+                    // convertPacketToDataLookline(packet.data, DataLookline);
+                    convertPacketToDataLooklinev1(packet.data, DataLooklinev1);
+                    
+                if(MeshConfig.debug) {
+                    // In ra dữ liệu đã chuyển đổi
+                    Serial.println("DataLookline:");
+                    Serial.print("Network ID: ");
+                    Serial.println(DataLooklinev1.networkID);
+                    Serial.print("Node ID: ");
+                    Serial.println(DataLooklinev1.nodeID);
+                    Serial.print("PLAN: ");
+                    Serial.println(DataLooklinev1.PLAN);
+                    Serial.print("RESULT: ");
+                    Serial.println(DataLooklinev1.RESULT);
+                    Serial.print("State: ");
+                    Serial.println(DataLooklinev1.state);
+                    Serial.print("Mode: ");
+                    Serial.println(DataLooklinev1.Mode);
+                    Serial.println("RSSI: " + String(DataLooklinev1.RSSI));
+                    Serial.println("Com: " + String(DataLooklinev1.Com));
+                    Serial.println("Wifi: " + String(DataLooklinev1.WiFi));
+                    Serial.println("Cmd: " + String(DataLooklinev1.Cmd));
+                    Serial.println("type: " + String(DataLooklinev1.type));
+                    Serial.println("NodeAmount: " + String(DataLooklinev1.Nodecounter));
+                    Serial.println("WifiChanel: " + String(MeshConfig.wifiChannel));
+                }
+                String id = "";
+                    id += String((DataLooklinev1.nodeID / 1000) % 10);
+                    id += String((DataLooklinev1.nodeID / 100) % 10);
+                    id += String((DataLooklinev1.nodeID / 10) % 10);
+                    id += String((DataLooklinev1.nodeID / 1) % 10);
+
+                String networkID = "";
+                    networkID += String((DataLooklinev1.networkID / 1000) % 10);
+                    networkID += String((DataLooklinev1.networkID / 100) % 10);
+                    networkID += String((DataLooklinev1.networkID / 10) % 10);
+                    networkID += String((DataLooklinev1.networkID / 1) % 10);
+
+                String StringPlan = "";
+                    StringPlan += (DataLooklinev1.PLAN / 1000) % 10;
+                    StringPlan += (DataLooklinev1.PLAN / 100) % 10;
+                    StringPlan += (DataLooklinev1.PLAN / 10) % 10;
+                    StringPlan += (DataLooklinev1.PLAN / 1) % 10;
+
+                String StringResult = "";
+                    StringResult += (DataLooklinev1.RESULT / 1000) % 10;
+                    StringResult += (DataLooklinev1.RESULT / 100) % 10;
+                    StringResult += (DataLooklinev1.RESULT / 10) % 10;
+                    StringResult += (DataLooklinev1.RESULT / 1) % 10;
+
+                String State = "";
+                if(DataLooklinev1.state){State ="1" + String(DataLooklinev1.Mode);}else{State = "0" + String(DataLooklinev1.Mode);}
+                String sentData = id + networkID + "04" + "18" + StringPlan + StringResult + State;
+
+                esp_err_t result;
+                if(MeshConfig.dataVersion == 3){  
+                    result = esp_now_send(MeshConfig.BrokerAddress, (uint8_t *) &DataLooklinev1, sizeof(DataLooklinev1));
+                }
+                
+                // if(MeshConfig.dataVersion == 0){  
+                    result = esp_now_send(MeshConfig.BrokerAddress, (uint8_t *)&DataLooklinev1, sizeof(DataLooklinev1));
+                // }
+                
+                if (result == ESP_OK)
+                {
+                    if (MeshConfig.debug) Serial.println("DataPacket sent success");
+                }
+                else if (result == ESP_ERR_ESPNOW_NOT_INIT)
+                {
+                    if (MeshConfig.debug) Serial.println("Mesh not Init.");
+                }
+                else if (result == ESP_ERR_ESPNOW_ARG)
+                {
+                    if (MeshConfig.debug) Serial.println("Invalid Argument");
+                }
+                else if (result == ESP_ERR_ESPNOW_INTERNAL)
+                {
+                    if (MeshConfig.debug) Serial.println("Internal Error");
+                }
+                else if (result == ESP_ERR_ESPNOW_NO_MEM)
+                {
+                    if (MeshConfig.debug) Serial.println("ESP_ERR_ESPNOW_NO_MEM");
+                }
+                else if (result == ESP_ERR_ESPNOW_NOT_FOUND)
+                {
+                    if (MeshConfig.debug) Serial.println("Peer not found.");
+                } else {
+                    if (MeshConfig.debug) Serial.println("Unknown error.");
+                }
             }
-            else if (result == ESP_ERR_ESPNOW_NOT_INIT)
-            {
-                if (MeshConfig.debug) Serial.println("Mesh not Init.");
-            }
-            else if (result == ESP_ERR_ESPNOW_ARG)
-            {
-                if (MeshConfig.debug) Serial.println("Invalid Argument");
-            }
-            else if (result == ESP_ERR_ESPNOW_INTERNAL)
-            {
-                if (MeshConfig.debug) Serial.println("Internal Error");
-            }
-            else if (result == ESP_ERR_ESPNOW_NO_MEM)
-            {
-                if (MeshConfig.debug) Serial.println("ESP_ERR_ESPNOW_NO_MEM");
-            }
-            else if (result == ESP_ERR_ESPNOW_NOT_FOUND)
-            {
-                if (MeshConfig.debug) Serial.println("Peer not found.");
-            } else {
-                if (MeshConfig.debug) Serial.println("Unknown error.");
-            }
-        }
+        }else if(received_msg_length > 0) {
+            if (MeshConfig.debug) Serial.println("Received message length is not equal to expected size.");
         }
     }   
 }
@@ -1062,6 +1008,7 @@ void TaskModbus(void *pvParameter)
     {
     }
 }
+
 void TaskWifiMQTT(void *pvParameter)
 {
     LOG("TaskMQTT Run in core ");
@@ -1079,10 +1026,12 @@ void TaskWifiMQTT(void *pvParameter)
 //////////////////////////////////////////////////////////////////////////////////////////////////
 void setup()
 {
-    
     // Khởi tạo EEPROM
     EEPROM.begin(EEPROM_SIZE);
     Serial.begin(115200);
+    SerialInit();
+
+    Serial.println("Starting...");
     #ifndef Gateway
     if (!FileSystem.begin()) {
         if (MeshConfig.debug) Serial.println("Failed to initialize LittleFS. Attempting to format...");
@@ -1119,10 +1068,6 @@ void setup()
     delay(1000);
     #endif//Gateway
 
-    if (MeshConfig.debug) Serial.println("Start Mesh");
-    // Output my MAC address - useful for later
-    if (MeshConfig.debug) Serial.print("Device Address: ");
-    if (MeshConfig.debug) Serial.println(WiFi.macAddress());
     // shut down wifi
     WiFi.disconnect();
     // startup ESP Now
@@ -1130,10 +1075,13 @@ void setup()
     WiFi.mode(WIFI_STA);
     WiFi.disconnect(); // Ngắt kết nối WiFi để đặt lại kênh
     esp_wifi_set_channel(MeshConfig.wifiChannel, WIFI_SECOND_CHAN_NONE); // Đặt kênh WiFi
+    esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_LR); // Đặt giao thức WiFi
+    esp_wifi_set_ps(WIFI_PS_NONE); // Tắt chế độ tiết kiệm năng lượng
+    WiFi.setSleep(false); // Tắt chế độ ngủ của WiFi
+    WiFi.mode(WIFI_STA); // Đặt chế độ WiFi là STA (Station)
 
     //Set device in STA mode to begin with
-    // 
-    if (MeshConfig.debug) Serial.println("Start Mesh");
+    if (MeshConfig.debug) Serial.println("Start Mesh LR");
     // Output my MAC address - useful for later
     if (MeshConfig.debug) Serial.print("Device Address: ");
     if (MeshConfig.debug) Serial.println(WiFi.macAddress());
@@ -1160,7 +1108,7 @@ void setup()
         if (MeshConfig.debug) Serial.println("Mesh Init Failed");
         delay(3000);
         ESP.restart();
-    }
+    } 
 
 
 #else//ESP8266
@@ -1189,7 +1137,7 @@ void setup()
     #ifdef USE_Modbus
     xTaskCreatePinnedToCore(TaskWifiMQTT, "TaskMain", 5000, NULL, 1, &TaskMQTT, 1);
     #endif//USE_Modbus
-    SerialInit();
+    Serial.println("Initialized.");
     
 }
 long timeCount = 0;
@@ -1201,6 +1149,7 @@ void loop()
     
     processSerialInput();// Serial input cmnd processing
     checkConfigButton();// Button Setup
+    receiveDataPacketFromSerial2();
     if(MeshConfig.dataVersion == 3 || MeshConfig.dataVersion == 0){receiveDataPacketFromSerial2();}//Data version3: Send recive data from Serial2 to Mesh
     if(MeshConfig.role == "Broker"){receiveDataPacketFromSerial2();}//Data version3: Send recive data from Serial2 to Mesh
 
