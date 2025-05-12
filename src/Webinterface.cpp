@@ -39,9 +39,47 @@ class CaptiveRequestHandler : public AsyncWebHandler {
         }
 };
 
-
 void WebinterFace::setupWebConfig() {
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////// Data Mapping //////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+    server.on("/data-mapping", HTTP_GET, [](AsyncWebServerRequest *request) {
+        if (LittleFS.exists(DATA_MAPPING_FILE)) {
+            File file = LittleFS.open(DATA_MAPPING_FILE, "r");
+            if (file) {
+                String json = file.readString();
+                file.close();
+                request->send(200, "application/json", json);
+            } else {
+                request->send(500, "application/json", "{\"error\":\"Failed to open data-mapping.json\"}");
+            }
+        } else {
+            request->send(404, "application/json", "{\"error\":\"data-mapping.json not found\"}");
+        }
+    });
 
+    server.on("/save-data-mapping", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
+    [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+        String body = String((char*)data).substring(0, len);
+        DynamicJsonDocument doc(1024);
+
+        DeserializationError error = deserializeJson(doc, body);
+        if (error) {
+            request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+            return;
+        }
+
+        // Save the configuration to data-mapping.json
+        File configFile = LittleFS.open(DATA_MAPPING_FILE, "w");
+        if (!configFile) {
+            request->send(500, "application/json", "{\"error\":\"Failed to save configuration\"}");
+            return;
+        }
+
+        serializeJson(doc, configFile);
+        configFile.close();
+        request->send(200, "application/json", "{\"status\":\"Configuration saved\"}");
+    });
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////// LoRa netwwork //////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -391,11 +429,11 @@ server.on("/save-wifi-mqtt-config", HTTP_POST, [](AsyncWebServerRequest *request
         request->send(response);
     });
     server.on("/index.html", HTTP_GET, [](AsyncWebServerRequest *request){
-        request->send(LittleFS, "/index.html", String(), false, processors);
+        request->send(LittleFS, "/index.html.gz", String(), false, processors);
         // connectClinent = true;
       });
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-        request->send(LittleFS, "/index.html", String(), false, processors);
+        request->send(LittleFS, "/index.html.gz", String(), false, processors);
         // connectClinent = true;
     });
     server.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request) {

@@ -75,17 +75,25 @@
     <div class="header">
         <h1>Node IoT Configuration</h1>
     </div>
-
     <div class="tabs">
         <div class="tab" onclick="showTab('meshConfig')">Mesh Network</div> 
         <div class="tab active" onclick="showTab('modbusConfig')">Modbus Configuration</div>
         <div class="tab" onclick="showTab('wifiConfig')">WiFi Configuration</div>
         <div class="tab" onclick="showTab('mqttConfig')">MQTT Configuration</div>
-        <div class="tab" onclick="showTab('loraConfig')">LoRa E32 Configuration</div>
-        <div class="tab" onclick="showTab('loraRYConfig')">LoRa RY Configuration</div>
+        <div class="tab" onclick="showTab('mappingData')">Mapping Data</div>
+        <!-- <div class="tab" onclick="showTab('loraConfig')">LoRa E32 Configuration</div>
+        <div class="tab" onclick="showTab('loraRYConfig')">LoRa RY Configuration</div> -->
         <div class="tab" onclick="showTab('fileManager')">File Manager</div>
     </div>
 <CENTER>
+    
+    <div id="mappingData" class="tab-content">
+        <h2>Mapping Data</h2>
+        <div id="nodesContainer">
+            <button type="button" onclick="addNode()">Add Node</button>
+            <button type="button" onclick="saveNodes()">Save</button>
+        </div>
+    </div>
     <div id="loraRYConfig" class="tab-content">
         <h2>LoRa RY Module Configuration</h2>
         <form id="loraRYConfigForm">
@@ -191,6 +199,106 @@
     </div>
 
     <script>
+        let nodeCounter = 0;
+        function saveNodes() {
+            const nodesContainer = document.getElementById('nodesContainer');
+            const nodes = Array.from(nodesContainer.children).filter(child => child.id.startsWith('node_'));
+            const nodeData = nodes.map(node => {
+                const nodeId = node.id;
+                const table = document.getElementById(`${nodeId}_table`).getElementsByTagName('tbody')[0];
+                const rows = Array.from(table.rows);
+                const data = rows.map(row => {
+                    const key = row.querySelector('input[name="keys[]"]').value;
+                    const address = parseInt(row.querySelector('input[name="addresses[]"]').value);
+                    const type = row.querySelector('select[name="types[]"]').value;
+                    return { key, a: address, t: type };
+                });
+                return { NodeId: nodeId, data };
+            });
+
+            const jsonData = { NodeData: nodeData };
+            console.log(JSON.stringify(jsonData, null, 2));
+        }
+        function addNode() {
+            const nodesContainer = document.getElementById('nodesContainer');
+            const nodeId = `node_${nodeCounter++}`;
+            const nodeDiv = document.createElement('div');
+            nodeDiv.id = nodeId;
+            nodeDiv.style.marginBottom = '20px';
+
+            nodeDiv.innerHTML = `
+                <h3>Node ${nodeCounter} <button type="button" onclick="deleteNode('${nodeId}')">Delete Node</button></h3>
+                <table id="${nodeId}_table">
+                    <thead>
+                        <tr>
+                            <th>Key</th>
+                            <th>Address</th>
+                            <th>Type</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+                <button type="button" onclick="addRow('${nodeId}_table')">Add Row</button>
+            `;
+
+            nodesContainer.appendChild(nodeDiv);
+        }
+
+        function deleteNode(nodeId) {
+            const nodeDiv = document.getElementById(nodeId);
+            nodeDiv.parentElement.removeChild(nodeDiv);
+        }
+
+        function addRow(tableId) {
+            const table = document.getElementById(tableId).getElementsByTagName('tbody')[0];
+            const lastRow = table.rows[table.rows.length - 1];
+            let lastAddress = 0;
+
+            if (lastRow) {
+                const lastType = lastRow.querySelector('select[name="types[]"]').value;
+                const lastAddressValue = parseInt(lastRow.querySelector('input[name="addresses[]"]').value);
+                lastAddress = lastType === 'Coils' ? lastAddressValue + 1 :
+                            lastType === 'WORD' ? lastAddressValue + 2 :
+                            lastAddressValue + 4;
+            }
+
+            const newRow = table.insertRow();
+            newRow.innerHTML = `
+                <td><input type="text" name="keys[]" placeholder="Enter Key" required></td>
+                <td><input type="number" name="addresses[]" value="${lastAddress}" readonly></td>
+                <td>
+                    <select name="types[]" onchange="updateAddresses('${tableId}')">
+                        <option value="Coils">Coils</option>
+                        <option value="WORD">WORD</option>
+                        <option value="DWORD">DWORD</option>
+                        <option value="FLOAT">FLOAT</option>
+                    </select>
+                </td>
+                <td><button type="button" onclick="deleteRow(this)">Delete</button></td>
+            `;
+        }
+
+        function deleteRow(button) {
+            const row = button.parentElement.parentElement;
+            const tableId = row.closest('table').id;
+            row.parentElement.removeChild(row);
+            updateAddresses(tableId);
+        }
+
+        function updateAddresses(tableId) {
+            const table = document.getElementById(tableId).getElementsByTagName('tbody')[0];
+            let currentAddress = 0;
+
+            Array.from(table.rows).forEach(row => {
+                const type = row.querySelector('select[name="types[]"]').value;
+                const addressInput = row.querySelector('input[name="addresses[]"]');
+                addressInput.value = currentAddress;
+                currentAddress += type === 'Coils' ? 1 :
+                                type === 'WORD' ? 2 :
+                                4;
+            });
+        }
          // Load LoRa RY Configuration
         function loadLoRaRYConfig() {
             fetch('/load-lora-config')

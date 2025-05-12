@@ -1,5 +1,7 @@
 #include "main.h"
+#include <ArduinoJson.h>
 
+#include <Arduino.h>
 int8_t BUZZ = -1;
 int8_t SETUP_BUTTON = -1;
 int8_t LED_STT = -1;
@@ -24,19 +26,38 @@ int8_t ETH_MDIO_PIN = -1;
 int8_t Ser_2RX = -1;
 int8_t Ser_2TX = -1;
 
+//#define TCP_ETH
+#define RTU_RS485
+
+
+#ifdef USE_Modbus
+#include "TskModbus.h"
+ModbusConfig mainModbusConfig;
+TaskHandle_t TaskMQTT;
+TaskHandle_t TaskModbus;
+
+#ifdef RTU_RS485
+#include "Modbus_RTU.h"
+Modbus_Prog iMagModbusCom;
+#endif//RTU_RS485
+  #ifdef TCP_ETH
+  #include "Network/Modbus_TCP.h"
+  Modbus_TCP_Prog iMagModbusCom;
+  #endif//TCP_ETH
+
 #include "WebInterface.h"
 WebinterFace mainwebInterface;
 #ifdef USE_Modbus
 #include "TskMQTT.h"
-WifiMqttConfig MQTTwifiConfig;
+WifiMqttConfig MQTTwifiConfig; // Ensure this is declared only if USE_Modbus is defined
 #define RTC_Onl
 #include "RTC_Online.h"
-RTCTimeOnline rtcTimeOnl;
+RTCTimeOnline rtcTimeOnl; // Ensure this is declared only if USE_Modbus is defined
 #include "LoRa.h"
-LoRaFunction mainLoRa;
+LoRaFunction mainLoRa; // Ensure this is declared only if USE_Modbus is defined
+// bool LoRanIit = false; // Added missing variable
 #endif// USE_Modbus
 #ifdef USE_Modbus
-#include "Modbus_RTU.h"
 Modbus_Prog mainModbusCom;
 #endif//USE_Modbus   
 #include "Wifi_conf.h"
@@ -94,6 +115,10 @@ typedef struct struct_Parameter_messageOld {
   } struct_Parameter_messageOld;
 
   struct_Parameter_messageOld DataLookline;
+
+  
+#include "DataMapping.h"
+
 
 JSONVar mainModbusSetting;
   
@@ -162,24 +187,7 @@ void set_Pinout(uint8_t BoardModel){
 
 void convertDataPacketToDataLookline(const dataPacket &packet, struct_Parameter_messageOld &dataLookline);
   
-//#define TCP_ETH
-#define RTU_RS485
 
-
-#ifdef USE_Modbus
-#include "TskModbus.h"
-ModbusConfig mainModbusConfig;
-TaskHandle_t TaskMQTT;
-TaskHandle_t TaskModbus;
-
-#ifdef RTU_RS485
-#include "Modbus_RTU.h"
-Modbus_Prog iMagModbusCom;
-#endif//RTU_RS485
-  #ifdef TCP_ETH
-  #include "Network/Modbus_TCP.h"
-  Modbus_TCP_Prog iMagModbusCom;
-  #endif//TCP_ETH
   void MainLoop();
 
 void SupendTask(){
@@ -271,6 +279,8 @@ void convertDataPacketToDataLookline(const dataPacket &packet, struct_Parameter_
     dataLookline.state = packet.data[4];
     dataLookline.Mode = packet.data[5];
 }
+
+
 void SerialInit() {
     #ifdef USE_SERIAL1
     Serial1.begin(Se_BAUD_RATE, SERIAL_8N1, Ser_1RX, Ser_1TX);
@@ -645,7 +655,25 @@ void sentCallback(const uint8_t *macAddr, esp_now_send_status_t status)
     if (MeshConfig.debug) Serial.print("Last Packet Send Status: ");
     if (MeshConfig.debug) Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
     // status == ESP_NOW_SEND_SUCCESS ? digitalWrite(BUZZ, LOW) :  digitalWrite(BUZZ, HIGH);delay(10);digitalWrite(BUZZ, LOW);
+    static int totalPacketsSent = 0;
+    static int successfulPackets = 0;
 
+    totalPacketsSent++;
+    if (status == ESP_NOW_SEND_SUCCESS) {
+        successfulPackets++;
+    }
+
+    float successRate = (totalPacketsSent > 0) ? (successfulPackets * 100.0 / totalPacketsSent) : 0.0;
+
+    if (MeshConfig.debug) {
+        Serial.print("Total Packets Sent: ");
+        Serial.print(totalPacketsSent);
+        Serial.print(" | Successful Packets: ");
+        Serial.print(successfulPackets);
+        Serial.print(" | Success Rate: ");
+        Serial.print(successRate);
+        Serial.println("%");
+    }
 }
 #ifdef ESP32_RISCV
 void receiveCallback(const esp_now_recv_info *recvInfo, const uint8_t *data, int dataLen) {
@@ -694,6 +722,20 @@ void receiveCallback(const esp_now_recv_info *recvInfo, const uint8_t *data, int
 #else//ESP32_RISCV
 #include <queue>
 
+void calculateSuccessRates() {
+    auto currentTime = std::chrono::steady_clock::now();
+
+    for (auto &entry : nodeDataMap) {
+        nodeData &node = entry.second;
+        auto duration = std::chrono::duration_cast<std::chrono::seconds>(currentTime - node.lastReceivedTime).count();
+
+        if (duration >= 5 && duration <= 7) {
+            node.dataSuccessRate = std::min(100.0f, node.dataSuccessRate + 1.0f);
+        }
+    }
+}
+
+
 std::queue<dataPacket> dataQueue;
 
 void receiveCallback(const uint8_t *senderMac, const uint8_t *data, int dataLen)
@@ -710,6 +752,9 @@ void receiveCallback(const uint8_t *senderMac, const uint8_t *data, int dataLen)
         if (MeshConfig.debug) Serial.print("Received data from: ");
         if (MeshConfig.debug) Serial.println(macStr);
         if (MeshConfig.debug) Serial.println("RSSI: " + String(rssi_display));
+        
+        updateNodeDataWithMapping(packet); // Cập nhật dữ liệu node
+        calculateSuccessRates(); // Tính toán tỷ lệ thành công
 
         memcpy(&packet, data, sizeof(packet));
         dataQueue.push(packet); // Lưu vào hàng đợi
@@ -800,24 +845,24 @@ void processQueue() {
         }
         #ifdef USE_Modbus
         // mainModbusCom.ModbusGetData(packet.data, sizeof(packet.data));
-        if (MeshConfig.debug) Serial.println("DataPacket received dataVersion = 2):");   
-        if (MeshConfig.debug) Serial.print("ID: " + String(packet.ID) + " | ");
-        if (MeshConfig.debug) Serial.print("netId: " + String(packet.netId));
-        if (MeshConfig.debug) Serial.println();
-        if (MeshConfig.debug) Serial.print("Data: ");
+        // if (MeshConfig.debug) Serial.println("DataPacket received dataVersion = 2):");   
+        // if (MeshConfig.debug) Serial.print("ID: " + String(packet.ID) + " | ");
+        // if (MeshConfig.debug) Serial.print("netId: " + String(packet.netId));
+        // if (MeshConfig.debug) Serial.println();
+        // if (MeshConfig.debug) Serial.print("Data: ");
         uint8_t dataIndex = 0; // Index to track position in packet.data
         for (int i = 0; i < (int)mainModbusSetting["Value"].length(); i++) {
             if ((int)mainModbusSetting["Type"][i] == 0) {
                 // Type 0: Coil Register
                 if (dataIndex < sizeof(packet.data)) {
-                    Serial.println("coils["+ String((int)mainModbusSetting["Value"][i]) + "]:" + String(packet.data[dataIndex++]));
+                    // Serial.println("coils["+ String((int)mainModbusSetting["Value"][i]) + "]:" + String(packet.data[dataIndex++]));
                     if(packet.data[dataIndex++] > 1){mainModbusCom.SetCoilReg((int)mainModbusSetting["Value"][i],1);}else{mainModbusCom.SetCoilReg((int)mainModbusSetting["Value"][i],0);}
                 }
             } else if ((int)mainModbusSetting["Type"][i] == 1) {
                 // Type 1: Holding Register
                 if (dataIndex + 1 < sizeof(packet.data)) {
                     uint16_t value = packet.data[dataIndex] << 8 | packet.data[dataIndex + 1];dataIndex = dataIndex + 2;
-                    Serial.println("holdingReg[" + String((int)mainModbusSetting["Value"][i]) + "]:" + String(value));
+                    // Serial.println("holdingReg[" + String((int)mainModbusSetting["Value"][i]) + "]:" + String(value));
                     mainModbusCom.SetHoldingReg((int)mainModbusSetting["Value"][i], value);
                 }
             } else if ((int)mainModbusSetting["Type"][i] == 2) {
@@ -826,7 +871,7 @@ void processQueue() {
                     uint32_t dwordValue = mainModbusCom.DWORD(
                         packet.data[dataIndex] << 8 | packet.data[dataIndex + 1],
                         packet.data[dataIndex + 2] << 8 | packet.data[dataIndex + 3]); dataIndex = dataIndex + 4;
-                    Serial.println("DWORD[" + String((int)mainModbusSetting["Value"][i]) + "]:" + String(dwordValue));
+                    // Serial.println("DWORD[" + String((int)mainModbusSetting["Value"][i]) + "]:" + String(dwordValue));
                     mainModbusCom.SetHoldingReg((int)mainModbusSetting["Value"][i], packet.data[dataIndex] << 8 | packet.data[dataIndex + 1]);
                     mainModbusCom.SetHoldingReg((int)mainModbusSetting["Value"][i+1], packet.data[dataIndex + 2] << 8 | packet.data[dataIndex + 3]);
                 }
@@ -836,7 +881,7 @@ void processQueue() {
                     float floatValue = (float)(mainModbusCom.DWORD(
                         packet.data[dataIndex] << 8 | packet.data[dataIndex + 1],
                         packet.data[dataIndex + 2] << 8 | packet.data[dataIndex + 3])) / 1000.0;dataIndex = dataIndex + 4;
-                    Serial.println("Float[" + String((int)mainModbusSetting["Value"][i]) + "]:" + String(floatValue));
+                    // Serial.println("Float[" + String((int)mainModbusSetting["Value"][i]) + "]:" + String(floatValue));
                     mainModbusCom.SetHoldingReg((int)mainModbusSetting["Value"][i], packet.data[dataIndex] << 8 | packet.data[dataIndex + 1]);
                     mainModbusCom.SetHoldingReg((int)mainModbusSetting["Value"][i+1], packet.data[dataIndex + 2] << 8 | packet.data[dataIndex + 3]);
                 }
@@ -929,6 +974,7 @@ void Broker(const String &message)
 unsigned long buttonPressTime = 0;
 
 void startConfigPortal() {
+
     if (MeshConfig.debug) Serial.println("Starting configuration portal...");
     digitalWrite(BUZZ, HIGH);delay(5);digitalWrite(BUZZ, LOW);
     digitalWrite(BUZZ, HIGH);delay(5);digitalWrite(BUZZ, LOW);
@@ -959,7 +1005,7 @@ void startConfigPortal() {
     current_wifi_interface = WIFI_IF_AP; // Sử dụng giao diện Wi-Fi Station
         WiFi.mode(WIFI_AP);
         WiFi.softAPConfig(apIP, apIP, subnet);
-        String APname = "MeshModule_" + String(MeshConfig.id);
+        String APname = "MeshModule[" + String(MeshConfig.id) + ']';
         WiFi.softAP(APname.c_str(), "12345678"); // Replace with your desired SSID and password
         dnsServer.start(DNS_PORT, "*", apIP);
         check_protocol();
@@ -970,6 +1016,7 @@ void startConfigPortal() {
     // }
     #endif//USE_Modbus
 }
+
 void checkConfigButton() {
     if(digitalRead(SETUP_BUTTON) == LOW) {
         if(buttonPressTime == 0) {
@@ -1185,26 +1232,30 @@ void setup()
     if(mqttEnable){
         MQTTwifiConfig.setup();
     }
-    // pinMode(M0_PIN, OUTPUT);
-    // pinMode(M1_PIN, OUTPUT);
-    // pinMode(M0_PIN_1, OUTPUT);
-    // pinMode(M1_PIN_1, OUTPUT);
-    // digitalWrite(M0_PIN, LOW);
-    // digitalWrite(M1_PIN, LOW);
-    // digitalWrite(M0_PIN_1, LOW);
-    // digitalWrite(M1_PIN_1, LOW);
+    if(MeshConfig.role == "Broker"){
+        loadDataMapping();
+    }
     //////////////////////////////////////////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////// Ethernet /////////////////////////////////////////////////////
-    Serial.println(" Pin ETH_MDC_PIN " + String(ETH_MDC_PIN) + " \n Pin ETH_MDIO_PIN " + String(ETH_MDIO_PIN) + " \n Pin ETH_POWER_PIN_ALTERNATIVE " + String(ETH_POWER_PIN_ALTERNATIVE));
-    pinMode(ETH_POWER_PIN_ALTERNATIVE, OUTPUT);
-    digitalWrite(ETH_POWER_PIN_ALTERNATIVE, HIGH);
-    if(ETH.begin(ETH_ADDR, ETH_POWER_PIN, ETH_MDC_PIN, ETH_MDIO_PIN, ETH_TYPE, ETH_CLK_MODE)){
-    //   ETH.config(str2IP(SettingData[6]), str2IP(SettingData[7]), str2IP(SettingData[8]), str2IP(SettingData[9]), str2IP(SettingData[10]));
-      EthernetAvilable = true;
-    }else{
-      LOGLN("Failed to init Ethernet");
-      EthernetAvilable = false;
+    if(ETH_MDC_PIN == -1 && ETH_MDIO_PIN == -1 && ETH_POWER_PIN_ALTERNATIVE == -1){
+        Serial.println(" Pin ETH_MDC_PIN " + String(ETH_MDC_PIN) + " \n Pin ETH_MDIO_PIN " + String(ETH_MDIO_PIN) + " \n Pin ETH_POWER_PIN_ALTERNATIVE " + String(ETH_POWER_PIN_ALTERNATIVE));
+        pinMode(ETH_POWER_PIN_ALTERNATIVE, OUTPUT);
+        digitalWrite(ETH_POWER_PIN_ALTERNATIVE, HIGH);
+        if(ETH.begin(ETH_ADDR, ETH_POWER_PIN, ETH_MDC_PIN, ETH_MDIO_PIN, ETH_TYPE, ETH_CLK_MODE)){
+        //   ETH.config(str2IP(SettingData[6]), str2IP(SettingData[7]), str2IP(SettingData[8]), str2IP(SettingData[9]), str2IP(SettingData[10]));
+          EthernetAvilable = true;
+        }else{
+          LOGLN("Failed to init Ethernet");
+          EthernetAvilable = false;
+        }
     }
+    else
+    {
+        LOGLN("Ethernet not available");
+        EthernetAvilable = false;
+    }
+
+    
     //////////////////////////////////////////////////////////////////////////////////////////////////////////
     #ifdef USE_Modbus
         String  StrConfig = mainModbusConfig.loadModbusConfig(MeshConfig.debug, FileSystem);
@@ -1328,8 +1379,9 @@ void loop()
         if (MeshConfig.debug) Serial.println("========================================================================");
         if (MeshConfig.debug) Serial.println("                          Loop Function");
         if (MeshConfig.debug) Serial.println("========================================================================");
+        printNodeDataWithMapping(); // In dữ liệu node
     }
-    if(!configMode || mqttEnable){
+    if(!configMode && mqttEnable){
         MQTTwifiConfig.loop();
     }
     processQueue();
@@ -1523,3 +1575,5 @@ void MainLoop()
     }
 // delay(3000);
 }
+
+//580 - 6-15 chỉ
