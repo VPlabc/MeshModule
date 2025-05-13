@@ -443,7 +443,38 @@ void sendData(String address, String data) {
     if (response.startsWith("+OK")) {
       LoRaInit = true;
       break;
-    } else if (response.startsWith("+ERR")) {
+    } 
+    if (response.startsWith("+RCV")) {
+      digitalWrite(12, HIGH);delay(100);digitalWrite(12, LOW);
+      // Phân tích dữ liệu
+      int firstComma = response.indexOf(',', 5);
+      int secondComma = response.indexOf(',', firstComma + 1);
+      int thirdComma = response.indexOf(',', secondComma + 1);
+      int fourthComma = response.indexOf(',', thirdComma + 1);
+
+      if (firstComma == -1 || secondComma == -1 || thirdComma == -1) return;
+
+      String addrStr = response.substring(5, firstComma);
+      String lenStr = response.substring(firstComma + 1, secondComma);
+      String hexData = response.substring(secondComma + 1, thirdComma);
+      String rssi = response.substring(thirdComma + 1, fourthComma);
+      String snr = response.substring(fourthComma + 1);
+
+      // Chuyển hex sang ASCII
+      // String asciiData = hexToAscii(hexData);
+
+      Serial.println("-----------------------------------");
+      Serial.print("Nhận từ địa chỉ: ");
+      Serial.println(addrStr);
+      Serial.print("Dữ liệu: ");
+      Serial.println(hexData);
+      Serial.print("RSSI: ");
+      Serial.println(rssi);
+      Serial.print("SNR: ");
+      Serial.println(snr);
+      Serial.println("-----------------------------------");
+    }
+    else if (response.startsWith("+ERR")) {
       break;
     }
     }
@@ -467,7 +498,7 @@ void LoRaFunction::receiveData() {
     Serial.println(response);
   // }
     response.trim();
-    digitalWrite(BUZZ, HIGH);delay(100);digitalWrite(BUZZ, LOW);
+      digitalWrite(12, HIGH);delay(100);digitalWrite(12, LOW);
     if (response.startsWith("+RCV")) {
       // Phân tích dữ liệu
       int firstComma = response.indexOf(',', 5);

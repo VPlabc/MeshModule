@@ -2,8 +2,6 @@
 #include <vector>
 #include <map>
 #include <chrono>
-#include <map>
-#include <chrono>
 struct nodeData {
     int id;
     int netId;
@@ -196,13 +194,25 @@ void printNodeDataWithMapping() {
     Serial.println("===== Node Data with Mapping =====");
     for (const auto &entry : nodeDataMap) {
         const nodeData &node = entry.second;
+        if (node.id == 0) {
+            Serial.println("Node 0 does not exist.");
+            continue;
+        }
+
         Serial.print("Node ID: ");
         Serial.print(node.id);
         Serial.print(" | Net ID: ");
         Serial.print(node.netId);
         Serial.print(" | Success Rate: ");
         Serial.print(node.dataSuccessRate);
-        Serial.println("%");
+        Serial.print("%");
+
+        // Calculate time ago
+        auto currentTime = std::chrono::steady_clock::now();
+        auto timeAgo = std::chrono::duration_cast<std::chrono::seconds>(currentTime - node.lastReceivedTime).count();
+        Serial.print(" | Time Ago: ");
+        Serial.print(timeAgo);
+        Serial.println(" seconds");
 
         Serial.print("Mapped Data Values: ");
         for (size_t i = 0; i < dataMapping.regAddresses.size(); ++i) {

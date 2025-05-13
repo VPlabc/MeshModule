@@ -21,6 +21,17 @@ String conId = "b8e54d33-b34a-45ab-b76f-62c8a9abc6c4";
 String mqttTopicStat = "iSoftMesh/Status";
 String mqttTopic = "iSoftMesh/data";
 String mqttTopicSub = "iSoftMesh/data/sub";
+int mqttKeepAlive = 60;
+bool mqttCleanSession = true;
+int mqttQos = 0;
+bool mqttRetain = false;
+String mqttLwtTopic = "iSoftMesh/LWT";
+String mqttLwtMessage = "Offline";
+int mqttLwtQos = 1;
+bool mqttLwtRetain = false;
+bool mqttLwtEnabled = false;
+int timezone = 7;
+bool mqttIsConnected = false;
 
 String processors(const String& var) {
     if (var == "HELLO_FROM_TEMPLATE") return F("Hello world!");
@@ -248,6 +259,15 @@ server.on("/save-wifi-mqtt-config", HTTP_POST, [](AsyncWebServerRequest *request
     conId = doc["conId"] | "b8e54d33-b34a-45ab-b76f-62c8a9abc6c4";
     mqttTopic = doc["mqttTopic"] | "test/topic";
     mqttTopicSub = doc["mqttTopicSub"] | "test/topic/sub";
+    mqttKeepAlive = doc["mqttKeepAlive"] | 60;
+    mqttCleanSession = doc["mqttCleanSession"] | true;
+    mqttQos = doc["mqttQos"] | 0;
+    mqttRetain = doc["mqttRetain"] | false;
+    mqttLwtTopic = doc["mqttLwtTopic"] | "iSoftMesh/LWT";
+    mqttLwtMessage = doc["mqttLwtMessage"] | "Offline";
+    mqttLwtQos = doc["mqttLwtQos"] | 1;
+    mqttLwtRetain = doc["mqttLwtRetain"] | false;
+    mqttLwtEnabled = doc["mqttLwtEnabled"] | false;
 #endif//USE_MQTT
     request->send(200, "application/json", "{\"status\":\"Configuration saved\"}");
 });
@@ -375,7 +395,8 @@ server.on("/save-wifi-mqtt-config", HTTP_POST, [](AsyncWebServerRequest *request
     server.on("/delete", HTTP_DELETE, [](AsyncWebServerRequest *request) {
         if (request->hasParam("file")) {
             String fileName = request->getParam("file")->value();
-            if (LittleFS.remove(fileName)) {
+            Serial.println("> delete file " + fileName);
+            if (LittleFS.remove("/" + fileName)) {
                 request->send(200, "text/plain", "File deleted");
             } else {
                 request->send(500, "text/plain", "Failed to delete file");
@@ -429,11 +450,11 @@ server.on("/save-wifi-mqtt-config", HTTP_POST, [](AsyncWebServerRequest *request
         request->send(response);
     });
     server.on("/index.html", HTTP_GET, [](AsyncWebServerRequest *request){
-        request->send(LittleFS, "/index.html.gz", String(), false, processors);
+        request->send(LittleFS, "/index.html", String(), false, processors);
         // connectClinent = true;
       });
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-        request->send(LittleFS, "/index.html.gz", String(), false, processors);
+        request->send(LittleFS, "/index.html", String(), false, processors);
         // connectClinent = true;
     });
     server.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request) {

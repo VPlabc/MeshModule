@@ -168,7 +168,7 @@ void WifiMqttConfig::loop() {
 }
 #endif// MQTT_V1
 
-bool mqttIsConnected = false;
+// bool mqttIsConnected = false;
 
 void WifiMqttConfig::saveJsonToWifiMqttFile(char &jsonString,bool debug, fs::FS &FileSystem) {
     File file = FileSystem.open(WIFIMQTT_FILE, "w");
@@ -205,6 +205,15 @@ String WifiMqttConfig::loadWifiMqttConfig(bool debug, fs::FS &FileSystem) {
         doc["conId"] = "b8e54d33-b34a-45ab-b76f-62c8a9abc6c4";
         doc["mqttTopic"] = "test/topic";
         doc["mqttTopicSub"] = "test/topic/sub";
+        doc["mqttKeepAlive"] = 60; // Default Keep Alive
+        doc["mqttCleanSession"] = true; // Default Clean Session
+        doc["mqttQos"] = 1; // Default QoS
+        doc["mqttRetain"] = false; // Default Retain
+        doc["mqttLwtTopic"] = "lwt/topic"; // Default Last Will Topic
+        doc["mqttLwtMessage"] = "Offline"; // Default Last Will Message
+        doc["mqttLwtQos"] = 1; // Default Last Will QoS
+        doc["mqttLwtRetain"] = false; // Default Last Will Retain
+        doc["mqttLwtEnabled"] = false; // Default Last Will Enabled
 
         // Lưu cấu hình mặc định vào file
         File configFile = FileSystem.open(WIFIMQTT_FILE, "w");
@@ -245,7 +254,7 @@ String WifiMqttConfig::loadWifiMqttConfig(bool debug, fs::FS &FileSystem) {
 #ifdef MQTT_Client
 
 void WifiMqttConfig::MQTTPush(String Topic,String Payload) {
-    if(WiFi.status() == WL_CONNECTED && mqttIsConnected)mqttClient.publish(Topic.c_str(), 0, true ,Payload.c_str());
+    if(WiFi.status() == WL_CONNECTED && mqttIsConnected)mqttClient.publish(Topic.c_str(), mqttQos, mqttRetain, Payload.c_str());
 }
 static int reconnectAttempts = 0; // Biến đếm số lần thử kết nối lại
 void connectToWifi() {
@@ -351,16 +360,39 @@ void connectToWifi() {
     Serial.println("Connected to MQTT.");
     Serial.print("Session present: ");
     Serial.println(sessionPresent);
-    uint16_t packetIdSub = mqttClient.subscribe(mqttTopicSub.c_str() , 2);
-    Serial.print("Subscribing at QoS 2, packetId: ");
+    uint16_t packetIdSub = mqttClient.subscribe(mqttTopicSub.c_str() , mqttQos);
+    Serial.print("Subscribing at QoS " + String(mqttQos) + ", packetId: ");
     Serial.println(packetIdSub);
     // mqttClient.publish("test/lol", 0, true, "test 1");
     // Serial.println("Publishing at QoS 0");
         String TimeAt = String(Getyear) + "-" + String(Getmonth) + "-" + String(Getday) + " " + String(Gethour) + ":" + String(Getmin) + ":" + String(Getsec);
         String payload = "Node Start at: " + TimeAt + " with IP: " + String(WiFi.localIP().toString());
     uint16_t packetIdPub1 = mqttClient.publish(mqttTopicStat.c_str(), 1, true, payload.c_str());payload.clear();TimeAt.clear();
-    Serial.print("Publishing at QoS 1, packetId: ");
+    Serial.print("Publishing at QoS " + String(mqttQos) + ", packetId: ");
     Serial.println(packetIdPub1);
+    // Set Last Will and Testament (LWT) if enabled
+    if (mqttLwtEnabled) {
+        mqttClient.setWill(
+            mqttLwtTopic.c_str(),
+            mqttLwtQos,
+            mqttLwtRetain,
+            mqttLwtMessage.c_str()
+        );
+        Serial.println("MQTT Last Will and Testament (LWT) configured.");
+    }
+
+    // Configure MQTT keep-alive, clean session, QoS, and retain settings
+    mqttClient.setKeepAlive(mqttKeepAlive);
+    mqttClient.setCleanSession(mqttCleanSession);
+
+    Serial.print("MQTT Keep Alive: ");
+    Serial.println(mqttKeepAlive);
+    Serial.print("MQTT Clean Session: ");
+    Serial.println(mqttCleanSession);
+    Serial.print("MQTT QoS: ");
+    Serial.println(mqttQos);
+    Serial.print("MQTT Retain: ");
+    Serial.println(mqttRetain);
     mqttIsConnected = true;
     xTimerStop(mqttReconnectTimer, 0);
   }
@@ -430,6 +462,16 @@ void connectToWifi() {
             conId = doc["conId"] | "b8e54d33-b34a-45ab-b76f-62c8a9abc6c4";
             mqttTopic = doc["mqttTopic"] | "test/topic";
             mqttTopicSub = doc["mqttTopicSub"] | "test/topic/sub";
+            mqttKeepAlive = doc["mqttKeepAlive"] | 60; // Default Keep Alive
+            mqttCleanSession = doc["mqttCleanSession"] | true; // Default Clean Session
+            mqttQos = doc["mqttQos"] | 1; // Default QoS
+            mqttRetain = doc["mqttRetain"] | false; // Default Retain
+            mqttLwtTopic = doc["mqttLwtTopic"] | "lwt/topic"; // Default Last Will Topic
+            mqttLwtMessage = doc["mqttLwtMessage"] | "Offline"; // Default Last Will Message
+            mqttLwtQos = doc["mqttLwtQos"] | 1; // Default Last Will QoS
+            mqttLwtRetain = doc["mqttLwtRetain"] | false; // Default Last Will Retain
+            mqttLwtEnabled = doc["mqttLwtEnabled"] | false; // Default Last Will Enabled
+            timezone = doc["timezone"] | 7; // Default timezone
         }
     }else{
         Serial.println("wifi_mqtt.json not found.");
@@ -446,6 +488,17 @@ void connectToWifi() {
         doc["conId"] = "b8e54d33-b34a-45ab-b76f-62c8a9abc6c4";
         doc["mqttTopic"] = "test/topic";
         doc["mqttTopicSub"] = "test/topic/sub";
+        doc["mqttKeepAlive"] = 60; // Default Keep Alive
+        doc["mqttCleanSession"] = true; // Default Clean Session
+        doc["mqttQos"] = 1; // Default QoS
+        doc["mqttRetain"] = false; // Default Retain
+        doc["mqttLwtTopic"] = "lwt/topic"; // Default Last Will Topic
+        doc["mqttLwtMessage"] = "Offline"; // Default Last Will Message
+        doc["mqttLwtQos"] = 1; // Default Last Will QoS
+        doc["mqttLwtRetain"] = false; // Default Last Will Retain
+        doc["mqttLwtEnabled"] = false; // Default Last Will Enabled
+        doc["timezone"] = 7; // Default timezone
+        
 
         // Lưu cấu hình mặc định vào file
         File configFile = LittleFS.open(WIFIMQTT_FILE, "w");
@@ -472,6 +525,26 @@ void connectToWifi() {
         Serial.println(mqttTopic);
         Serial.print("MQTT Topic Sub: ");
         Serial.println(mqttTopicSub);
+        Serial.print("MQTT Keep Alive: ");
+        Serial.println(mqttKeepAlive);
+        Serial.print("MQTT Clean Session: ");
+        Serial.println(mqttCleanSession);
+        Serial.print("MQTT QoS: ");
+        Serial.println(mqttQos);
+        Serial.print("MQTT Retain: ");
+        Serial.println(mqttRetain);
+        Serial.print("MQTT Last Will Topic: ");
+        Serial.println(mqttLwtTopic);
+        Serial.print("MQTT Last Will Message: ");
+        Serial.println(mqttLwtMessage);
+        Serial.print("MQTT Last Will QoS: ");
+        Serial.println(mqttLwtQos);
+        Serial.print("MQTT Last Will Retain: ");
+        Serial.println(mqttLwtRetain);
+        Serial.print("MQTT Last Will Enabled: ");
+        Serial.println(mqttLwtEnabled);
+        Serial.print("Timezone: ");
+        Serial.println(timezone);
         Serial.println("SSID: " + ssid);
         Serial.println("Password: " + pass);
         Serial.println("WiFi Mode: " + wifiMode);

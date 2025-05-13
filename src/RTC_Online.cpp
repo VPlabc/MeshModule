@@ -85,17 +85,13 @@ void  RTCTimeOnline::SetTimeForRTC(){
   }
 #endif//RTC_DS3231
 }
-void RTCTimeOnline::Time_setup() {
+void RTCTimeOnline::Time_setup(int timezoneOffset) {
   // Initialize Serial Monitor
 
-// Initialize a NTPClient to get time
+  // Initialize a NTPClient to get time
   timeClient.begin();
-  // Set offset time in seconds to adjust for your timezone, for example:
-  // GMT +1 = 3600
-  // GMT +8 = 28800
-  // GMT -1 = -3600
-  // GMT 0 = 0
-  timeClient.setTimeOffset(+7);
+  // Set offset time in seconds to adjust for your timezone
+  timeClient.setTimeOffset(timezoneOffset);
 }
 bool TimeOnce = 1;
 bool TimeDSOnce = 1;

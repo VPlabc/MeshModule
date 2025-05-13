@@ -34,6 +34,16 @@ extern String conId;
 extern String mqttTopicStat;
 extern String mqttTopic;
 extern String mqttTopicSub;
+extern int mqttKeepAlive;
+extern bool mqttCleanSession;
+extern int mqttQos;
+extern bool mqttRetain;
+extern String mqttLwtTopic;
+extern String mqttLwtMessage;
+extern int mqttLwtQos;
+extern bool mqttLwtRetain;
+extern bool mqttLwtEnabled;
+extern int timezone;
 extern bool mqttIsConnected;
 
 class WifiMqttConfig {

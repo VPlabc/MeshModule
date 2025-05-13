@@ -28,7 +28,7 @@ extern long GetEpoch;
 class RTCTimeOnline {
   public:
     void RTCGetTime();
-    void Time_setup();
+    void Time_setup(int timezoneOffset);
     void Time_loop();
     void GetTime();
     void SetTimeForRTC();

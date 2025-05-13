@@ -25,6 +25,7 @@ int8_t ETH_MDC_PIN = -1;
 int8_t ETH_MDIO_PIN = -1;
 int8_t Ser_2RX = -1;
 int8_t Ser_2TX = -1;
+// int timezone = 7;
 
 //#define TCP_ETH
 #define RTU_RS485
@@ -80,6 +81,7 @@ struct __attribute__((packed)) dataPacket {
     int ID;
     int netId;
     uint8_t data[200];
+    uint8_t dataSize;
 };
 
 dataPacket packet;
@@ -117,8 +119,10 @@ typedef struct struct_Parameter_messageOld {
   struct_Parameter_messageOld DataLookline;
 
   
-#include "DataMapping.h"
-
+// #include "DataMapping.h"
+#include "StoreData.h"
+// Định nghĩa thực tế của nodeDataMaps
+std::map<int, NodeDatas> nodeDataMaps;
 
 JSONVar mainModbusSetting;
   
@@ -133,7 +137,7 @@ bool configMode = false;
 /*board RS485-Wifi*/
 int8_t Board0[] = {/*BUZZ*/ -1, /*SETUP_BUTTON*/ 26, /*LED_STT*/ 25, /*I2C_SDA*/ 21, /*I2C_SCL*/ 22, /*Y8*/ -1, /*Y9*/ -1, /*DA0*/ -1, /*DA1*/ -1, /*InPut0*/ -1, /*InPut1*/ -1, /*InPut2*/ -1, /*InPut3*/ -1, /*InPut4*/ -1, /*Ser_1RX*/ 15, /*Ser_1TX*/  2, /*M0_PIN*/ -1, /*M1_PIN*/ -1, /*ETH_POWER_PIN_ALTERNATIVE*/ 14, /*ETH_MDC_PIN*/ 23, /*ETH_MDIO_PIN*/ 18, /*Ser_2RX*/ 16, /*Ser_2TX*/ 17};
 /*board 410WER-Wifi*/
-int8_t Board1[] = {/*BUZZ*/ 12, /*SETUP_BUTTON*/ 13, /*LED_STT*/  4, /*I2C_SDA*/ 32, /*I2C_SCL*/ 33, /*Y8*/  4, /*Y9*/  5, /*DA0*/ 39, /*DA1*/ 36, /*InPut0*/  0, /*InPut1*/ 34, /*InPut2*/ 35, /*InPut3*/ 15, /*InPut4*/ -1, /*Ser_1RX*/ 32, /*Ser_1TX*/ 33, /*M0_PIN*/ -1, /*M1_PIN*/ -1, /*ETH_POWER_PIN_ALTERNATIVE*/ 14, /*ETH_MDC_PIN*/ 23, /*ETH_MDIO_PIN*/ 18, /*Ser_2RX*/ 16, /*Ser_2TX*/ 17};
+int8_t Board1[] = {/*BUZZ*/ 12, /*SETUP_BUTTON*/ 13, /*LED_STT*/  4, /*I2C_SDA*/ 32, /*I2C_SCL*/ 33, /*Y8*/  4, /*Y9*/  5, /*DA0*/ 39, /*DA1*/ 36, /*InPut0*/  0, /*InPut1*/ 34, /*InPut2*/ 35, /*InPut3*/ 15, /*InPut4*/ -1, /*Ser_1RX*/ 33, /*Ser_1TX*/ 32, /*M0_PIN*/ -1, /*M1_PIN*/ -1, /*ETH_POWER_PIN_ALTERNATIVE*/ 14, /*ETH_MDC_PIN*/ 23, /*ETH_MDIO_PIN*/ 18, /*Ser_2RX*/ 16, /*Ser_2TX*/ 17};
 /*board LkLineGW*/
 int8_t Board2[] = {/*BUZZ*/ -1, /*SETUP_BUTTON*/  0, /*LED_STT*/ 27, /*I2C_SDA*/ 21, /*I2C_SCL*/ 22, /*Y8*/ -1, /*Y9*/ -1, /*DA0*/ -1, /*DA1*/ -1, /*InPut0*/ -1, /*InPut1*/ -1, /*InPut2*/ -1, /*InPut3*/ -1, /*InPut4*/ -1, /*Ser_1RX*/ -1, /*Ser_1TX*/ -1, /*M0_PIN*/ -1, /*M1_PIN*/ -1, /*ETH_POWER_PIN_ALTERNATIVE*/ 14, /*ETH_MDC_PIN*/ 23, /*ETH_MDIO_PIN*/ 18, /*Ser_2RX*/ 16, /*Ser_2TX*/ 17};
 /*board LkLineNode*/
@@ -324,6 +328,7 @@ void loadConfig() {
         MeshConfig.macSlaves = doc.createNestedArray("macSlaves");
         MeshConfig.dataVersion = 0; // Default dataVersion
         MeshConfig.boardModel = 1;
+        MeshConfig.LoRaEnable = 0;
         saveConfig(); // Save the configuration
         return;
     }
@@ -365,6 +370,7 @@ void loadConfig() {
     MeshConfig.role = doc["role"] | "Node"; // Default to "Node" if not specified
     MeshConfig.debug = doc["debug"] | true; // Default debug enabled
     MeshConfig.macSlaves = doc["macSlaves"].as<JsonArray>();
+    MeshConfig.LoRaEnable = doc["loraEnb"] | false;
     file.close();
     set_Pinout(MeshConfig.boardModel);
     if (MeshConfig.debug) Serial.println("Config loaded.");
@@ -648,15 +654,16 @@ void saveMacToMacList(const uint8_t *macAddr, int id) {
     }
 }
 
-#ifdef ESP32
+#ifdef ESP32    
+    static int totalPacketsSent = 0;
+    static int successfulPackets = 0;
 // callback when data is sent
 void sentCallback(const uint8_t *macAddr, esp_now_send_status_t status) 
 {
     if (MeshConfig.debug) Serial.print("Last Packet Send Status: ");
     if (MeshConfig.debug) Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
     // status == ESP_NOW_SEND_SUCCESS ? digitalWrite(BUZZ, LOW) :  digitalWrite(BUZZ, HIGH);delay(10);digitalWrite(BUZZ, LOW);
-    static int totalPacketsSent = 0;
-    static int successfulPackets = 0;
+
 
     totalPacketsSent++;
     if (status == ESP_NOW_SEND_SUCCESS) {
@@ -722,18 +729,7 @@ void receiveCallback(const esp_now_recv_info *recvInfo, const uint8_t *data, int
 #else//ESP32_RISCV
 #include <queue>
 
-void calculateSuccessRates() {
-    auto currentTime = std::chrono::steady_clock::now();
 
-    for (auto &entry : nodeDataMap) {
-        nodeData &node = entry.second;
-        auto duration = std::chrono::duration_cast<std::chrono::seconds>(currentTime - node.lastReceivedTime).count();
-
-        if (duration >= 5 && duration <= 7) {
-            node.dataSuccessRate = std::min(100.0f, node.dataSuccessRate + 1.0f);
-        }
-    }
-}
 
 
 std::queue<dataPacket> dataQueue;
@@ -753,8 +749,6 @@ void receiveCallback(const uint8_t *senderMac, const uint8_t *data, int dataLen)
         if (MeshConfig.debug) Serial.println(macStr);
         if (MeshConfig.debug) Serial.println("RSSI: " + String(rssi_display));
         
-        updateNodeDataWithMapping(packet); // Cập nhật dữ liệu node
-        calculateSuccessRates(); // Tính toán tỷ lệ thành công
 
         memcpy(&packet, data, sizeof(packet));
         dataQueue.push(packet); // Lưu vào hàng đợi
@@ -768,7 +762,7 @@ void receiveCallback(const uint8_t *senderMac, const uint8_t *data, int dataLen)
             SerialTTL.flush();
         }
         else if(MeshConfig.dataVersion == 2){//Modbus Reg
-            if (MeshConfig.role == "Repeater") {
+            if (MeshConfig.role == "Repeater" || MeshConfig.role == "Node") {
                 int result = esp_now_send(MeshConfig.BrokerAddress, (uint8_t *)&packet, sizeof(packet));
                 if (result == ESP_OK) {
                     digitalWrite(BUZZ, HIGH);delay(2);digitalWrite(BUZZ, LOW);
@@ -777,6 +771,7 @@ void receiveCallback(const uint8_t *senderMac, const uint8_t *data, int dataLen)
                     if (MeshConfig.debug) Serial.println("Repeater failed to forward data to Broker.");
                 }
             }
+            updateNodeData(packet, macStr); // Save the received data along with the sender's MAC address
         }
         else if(MeshConfig.dataVersion == 1){
             if(MeshConfig.role == "Broker"){
@@ -839,6 +834,9 @@ void processQueue() {
         dataPacket packet = dataQueue.front(); // Lấy phần tử đầu tiên
         dataQueue.pop(); // Xóa phần tử đầu tiên
         // Xử lý dữ liệu trong packet
+        
+        // updateNodeDataWithMapping(packet); // Cập nhật dữ liệu node
+        calculateSuccessRates(); // Tính toán tỷ lệ thành công
         if (MeshConfig.debug) {
             Serial.print("Processing packet ID: ");
             Serial.println(packet.ID);
@@ -1207,6 +1205,51 @@ IPAddress str2IP(String str)
     IPAddress ret(getIpBlock(0, str), getIpBlock(1, str), getIpBlock(2, str), getIpBlock(3, str));
     return ret;
 }
+#include <WebSocketsServer.h>
+
+WebSocketsServer webSocket = WebSocketsServer(81);
+
+void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length) {
+    switch (type) {
+        case WStype_DISCONNECTED:
+            if (MeshConfig.debug) Serial.printf("[%u] Disconnected!\n", num);
+            break;
+        case WStype_CONNECTED: {
+            IPAddress ip = webSocket.remoteIP(num);
+            if (MeshConfig.debug) Serial.printf("[%u] Connected from %s\n", num, ip.toString().c_str());
+            webSocket.sendTXT(num, "Connected to WebSocket server");
+            break;
+        }
+        case WStype_TEXT:
+            if (MeshConfig.debug) Serial.printf("[%u] Received text: %s\n", num, payload);
+            // Handle received data
+            if (strcmp((char *)payload, "getConfig") == 0) {
+                DynamicJsonDocument doc(512);
+                doc["id"] = MeshConfig.id;
+                doc["netId"] = MeshConfig.netId;
+                doc["role"] = MeshConfig.role;
+                doc["debug"] = MeshConfig.debug;
+                String response;
+                serializeJson(doc, response);
+                webSocket.sendTXT(num, response);
+            } else if (strcmp((char *)payload, "toggleDebug") == 0) {
+                MeshConfig.debug = !MeshConfig.debug;
+                webSocket.sendTXT(num, String("Debug mode: ") + (MeshConfig.debug ? "Enabled" : "Disabled"));
+            }
+            break;
+        case WStype_BIN:
+            if (MeshConfig.debug) Serial.printf("[%u] Received binary data\n", num);
+            break;
+        default:
+            break;
+    }
+}
+
+void setupWebSocket() {
+    webSocket.begin();
+    webSocket.onEvent(webSocketEvent);
+    if (MeshConfig.debug) Serial.println("WebSocket server started on port 81");
+}
 //////////////////////////////////////////////////////////////////////////////////////////////////
 void setup()
 {
@@ -1233,7 +1276,7 @@ void setup()
         MQTTwifiConfig.setup();
     }
     if(MeshConfig.role == "Broker"){
-        loadDataMapping();
+        // loadDataMapping();
     }
     //////////////////////////////////////////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////// Ethernet /////////////////////////////////////////////////////
@@ -1286,6 +1329,13 @@ void setup()
             MeshConfig.wifiChannel = WiFi.channel();
             if (MeshConfig.debug) Serial.println("WiFi channel set to: " + String(MeshConfig.wifiChannel));
             esp_wifi_set_promiscuous_rx_cb(&promiscuous_rx_cb);
+        } else {
+            if (MeshConfig.debug) Serial.println("WiFi not connected. Retrying...");
+            WiFi.begin(); // Retry WiFi connection
+            delay(5000);  // Wait for connection
+            if (WiFi.status() != WL_CONNECTED) {
+                if (MeshConfig.debug) Serial.println("Failed to connect to WiFi. Check your configuration.");
+            }
         }
     }
     else{
@@ -1322,8 +1372,7 @@ void setup()
         peerInfo.channel = MeshConfig.wifiChannel;
         peerInfo.encrypt = false;
         peerInfo.ifidx = WIFI_IF_STA;
-        // Cấu hình tốc độ truyền Long Range
-        peerInfo.lmk[0] = 0; // Không dùng mã hóa
+        peerInfo.lmk[0] = 0;
         esp_wifi_config_espnow_rate(WIFI_IF_STA, WIFI_PHY_RATE_LORA_250K);
         if (!esp_now_is_peer_exist(MeshConfig.BrokerAddress))
         {
@@ -1351,8 +1400,8 @@ void setup()
     }
 
     esp_now_set_self_role(MY_ROLE);   
-    esp_now_register_send_cb(transmissionComplete);         // this function will get called once all data is sent
-    esp_now_register_recv_cb(dataReceived);               // this function will get called whenever we receive data
+    esp_now_register_send_cb(transmissionComplete);         
+    esp_now_register_recv_cb(dataReceived);               
     esp_now_add_peer(MeshConfig.BrokerAddress, RECEIVER_ROLE, MeshConfig.wifiChannel, NULL, 0);
 
 #endif//ESP32
@@ -1361,13 +1410,16 @@ void setup()
     pinMode(LED_STT, OUTPUT);
     digitalWrite(LED_STT, HIGH); // turn off the LED
     xTaskCreatePinnedToCore(TskModbus, "TaskModbus", 10000, NULL, 2, &TaskModbus, 1);
-    rtcTimeOnl.Time_setup();
+    Serial.println("Timezone: " + String(timezone));
+    rtcTimeOnl.Time_setup(timezone);
     // #ifdef Module_10O4I
     pinMode(BUZZ, OUTPUT);
     pinMode(Y8, OUTPUT);
     pinMode(Y9, OUTPUT);
     digitalWrite(BUZZ, HIGH);delay(50);digitalWrite(BUZZ, LOW);
     // #endif
+    // LittleFS.remove("/index.html");
+    setupWebSocket();
 }
 long timeCount = 0;
 bool once1 = false;
@@ -1379,7 +1431,10 @@ void loop()
         if (MeshConfig.debug) Serial.println("========================================================================");
         if (MeshConfig.debug) Serial.println("                          Loop Function");
         if (MeshConfig.debug) Serial.println("========================================================================");
-        printNodeDataWithMapping(); // In dữ liệu node
+        // printNodeDataWithMapping(); // In dữ liệu node
+        printNodeData() ;
+        String jsonString = createJsonForWebSocket();
+        webSocket.broadcastTXT(jsonString);
     }
     if(!configMode && mqttEnable){
         MQTTwifiConfig.loop();
@@ -1404,14 +1459,14 @@ void MainLoop()
     static long ModbusCurrentMillis = millis();
     if(millis() -  ModbusCurrentMillis >= randomDelay) {randomDelay = random(5000, 7000);
         ModbusCurrentMillis = millis();  
-    if(MeshConfig.role == "Node"){if(LoRaInit)mainLoRa.LoRaLoop(2);}//Data version3: Send recive data from Serial2 to Mesh
+    if(MeshConfig.role == "Node" || MeshConfig.role == "Repeater" ){if(LoRaInit)mainLoRa.LoRaLoop(MeshConfig.netId);}//Data version3: Send recive data from Serial2 to Mesh
         // Serial.println("Loop with dataVersion = " + String(MeshConfig.dataVersion) +" with Mesh role " + MeshConfig.role + " | LoRa Init: " + String(LoRaInit ? "connected":"disconnected"));
         #ifdef USE_MQTT
         if(WiFi.status() == WL_CONNECTED && mqttIsConnected == true) {
             String payloadSent = "";
             String DataAt = "";
-            String TimeAt = String(Getyear) + "-" + String(Getmonth) + "-" + String(Getday) + " " + String(Gethour) + ":" + String(Getmin) + ":" + String(Getsec);
             rtcTimeOnl.Time_loop();rtcTimeOnl.GetTime();
+            String TimeAt = String(Getyear) + "-" + String(Getmonth) + "-" + String(Getday) + " " + String(Gethour) + ":" + String(Getmin) + ":" + String(Getsec);
                 if((int)mainModbusSetting["Type"][0] == 0){
                     DataAt = "{\"key\":\""+ String((int)mainModbusSetting["Tag"][0]) + "\",\"value\":" + String(mainModbusCom.GetCoilReg((int)mainModbusSetting["Value"][0])) + "}" ;
                 }
@@ -1528,7 +1583,7 @@ void MainLoop()
                         }
                     }
                 }
-                
+                packet.dataSize = dataIndex;
                 packet.ID = MeshConfig.id;
                 packet.netId = MeshConfig.netId;
                 // Serial.println("DataPacket sent dataVersion = 2) with Mesh role " + MeshConfig.role);
