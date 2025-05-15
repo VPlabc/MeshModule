@@ -1,4 +1,5 @@
 #include "WebInterface.h"
+#include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <LittleFS.h>
 #include "LoRa.h"
@@ -7,6 +8,7 @@ LoRaFunction configLoRa;
 const String localIPURL = "http://192.168.4.1";	 // a string version of the local IP with http, used for redirecting clients to your webpage
 
 AsyncWebServer server(80);
+AsyncWebSocket ws("/ws");
 
 String mqttHost = "broker.hivemq.com";
 int mqttPort = 1883;
@@ -32,6 +34,7 @@ bool mqttLwtRetain = false;
 bool mqttLwtEnabled = false;
 int timezone = 7;
 bool mqttIsConnected = false;
+bool socketConnected = false;
 
 String processors(const String& var) {
     if (var == "HELLO_FROM_TEMPLATE") return F("Hello world!");
@@ -50,8 +53,55 @@ class CaptiveRequestHandler : public AsyncWebHandler {
         }
 };
 
-void WebinterFace::setupWebConfig() {
+////////////////////////////////////////// Web Socket ///////////////////////////////////////////////////
+
+void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
+    AwsFrameInfo *info = (AwsFrameInfo*)arg;
+    if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
+      data[len] = 0;
+    //   if (strcmp((char*)data, "toggle") == 0) {
+    //     ledState = !ledState;
+    //     notifyClients();
+    //   }
+        Serial.println("Data Recive:" + String((char*)data));
+    }
+  }
+  void WebinterFace::SendMessageToClient(const String& message) {
+    ws.textAll(message);
+  }
+  void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type,
+               void *arg, uint8_t *data, size_t len) {
+    switch (type) {
+      case WS_EVT_CONNECT:
+        Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
+        socketConnected = true;
+        break;
+      case WS_EVT_DISCONNECT:
+        Serial.printf("WebSocket client #%u disconnected\n", client->id());
+        socketConnected = false;
+        break;
+      case WS_EVT_DATA:
+        handleWebSocketMessage(arg, data, len);
+        break;
+      case WS_EVT_PONG:
+      case WS_EVT_ERROR:
+        break;
+    }
+  }
+  
+  void initWebSocket() {
+    ws.onEvent(onEvent);
+    server.addHandler(&ws);
+  }
+void WebinterFace::SocketLoop() {
+    ws.cleanupClients();
+  }
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+void WebinterFace::setupWebConfig() {
+    initWebSocket();
+/////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
 ////////////////////////////////////////// Data Mapping //////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
     server.on("/data-mapping", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -388,6 +438,7 @@ server.on("/save-wifi-mqtt-config", HTTP_POST, [](AsyncWebServerRequest *request
             }
             if (final) {
                 Serial.printf("File upload complete: %s\n", filename.c_str());
+                
             }
         });
 

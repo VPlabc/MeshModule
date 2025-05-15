@@ -1205,51 +1205,7 @@ IPAddress str2IP(String str)
     IPAddress ret(getIpBlock(0, str), getIpBlock(1, str), getIpBlock(2, str), getIpBlock(3, str));
     return ret;
 }
-#include <WebSocketsServer.h>
 
-WebSocketsServer webSocket = WebSocketsServer(81);
-
-void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length) {
-    switch (type) {
-        case WStype_DISCONNECTED:
-            if (MeshConfig.debug) Serial.printf("[%u] Disconnected!\n", num);
-            break;
-        case WStype_CONNECTED: {
-            IPAddress ip = webSocket.remoteIP(num);
-            if (MeshConfig.debug) Serial.printf("[%u] Connected from %s\n", num, ip.toString().c_str());
-            webSocket.sendTXT(num, "Connected to WebSocket server");
-            break;
-        }
-        case WStype_TEXT:
-            if (MeshConfig.debug) Serial.printf("[%u] Received text: %s\n", num, payload);
-            // Handle received data
-            if (strcmp((char *)payload, "getConfig") == 0) {
-                DynamicJsonDocument doc(512);
-                doc["id"] = MeshConfig.id;
-                doc["netId"] = MeshConfig.netId;
-                doc["role"] = MeshConfig.role;
-                doc["debug"] = MeshConfig.debug;
-                String response;
-                serializeJson(doc, response);
-                webSocket.sendTXT(num, response);
-            } else if (strcmp((char *)payload, "toggleDebug") == 0) {
-                MeshConfig.debug = !MeshConfig.debug;
-                webSocket.sendTXT(num, String("Debug mode: ") + (MeshConfig.debug ? "Enabled" : "Disabled"));
-            }
-            break;
-        case WStype_BIN:
-            if (MeshConfig.debug) Serial.printf("[%u] Received binary data\n", num);
-            break;
-        default:
-            break;
-    }
-}
-
-void setupWebSocket() {
-    webSocket.begin();
-    webSocket.onEvent(webSocketEvent);
-    if (MeshConfig.debug) Serial.println("WebSocket server started on port 81");
-}
 //////////////////////////////////////////////////////////////////////////////////////////////////
 void setup()
 {
@@ -1326,8 +1282,8 @@ void setup()
             }
         }
         if(WiFi.status() == WL_CONNECTED){
-            MeshConfig.wifiChannel = WiFi.channel();
-            if (MeshConfig.debug) Serial.println("WiFi channel set to: " + String(MeshConfig.wifiChannel));
+            // MeshConfig.wifiChannel = WiFi.channel();
+            // if (MeshConfig.debug) Serial.println("WiFi channel set to: " + String(MeshConfig.wifiChannel));
             esp_wifi_set_promiscuous_rx_cb(&promiscuous_rx_cb);
         } else {
             if (MeshConfig.debug) Serial.println("WiFi not connected. Retrying...");
@@ -1419,7 +1375,7 @@ void setup()
     digitalWrite(BUZZ, HIGH);delay(50);digitalWrite(BUZZ, LOW);
     // #endif
     // LittleFS.remove("/index.html");
-    setupWebSocket();
+    // setupWebSocket();
 }
 long timeCount = 0;
 bool once1 = false;
@@ -1433,13 +1389,19 @@ void loop()
         if (MeshConfig.debug) Serial.println("========================================================================");
         // printNodeDataWithMapping(); // In dữ liệu node
         printNodeData() ;
-        String jsonString = createJsonForWebSocket();
-        webSocket.broadcastTXT(jsonString);
+            String jsonString = createJsonForWebSocket();
+            // Serial.println("Data: " + jsonString);
+        if(socketConnected){
+            mainwebInterface.SendMessageToClient(jsonString);
+        }
     }
     if(!configMode && mqttEnable){
         MQTTwifiConfig.loop();
     }
     processQueue();
+    if(configMode){
+        mainwebInterface.SocketLoop();
+    }
 }
 
 void MainLoop()
@@ -1467,48 +1429,7 @@ void MainLoop()
             String DataAt = "";
             rtcTimeOnl.Time_loop();rtcTimeOnl.GetTime();
             String TimeAt = String(Getyear) + "-" + String(Getmonth) + "-" + String(Getday) + " " + String(Gethour) + ":" + String(Getmin) + ":" + String(Getsec);
-                if((int)mainModbusSetting["Type"][0] == 0){
-                    DataAt = "{\"key\":\""+ String((int)mainModbusSetting["Tag"][0]) + "\",\"value\":" + String(mainModbusCom.GetCoilReg((int)mainModbusSetting["Value"][0])) + "}" ;
-                }
-                if((int)mainModbusSetting["Type"][0] == 1){
-                    DataAt = "{\"key\":\""+ String((int)mainModbusSetting["Tag"][0]) + "\",\"value\":" + String(mainModbusCom.GetHoldingReg((int)mainModbusSetting["Value"][0])) + "}" ;
-                }
-                if((int)mainModbusSetting["Type"][0] == 2){
-                    uint32_t dwordValue = mainModbusCom.DWORD(
-                        mainModbusCom.GetHoldingReg((int)mainModbusSetting["Value"][0]), 
-                        mainModbusCom.GetHoldingReg(((int)mainModbusSetting["Value"][0]) + 1));
-                    DataAt = "{\"key\":\""+ String((int)mainModbusSetting["Tag"][0]) + "\",\"value\":" + String(dwordValue) + "}" ;
-                }
-                if((int)mainModbusSetting["Type"][0] == 3){
-                    DataAt = "{\"key\":\""+ String((int)mainModbusSetting["Tag"][0]) + "\",\"value\":" + String(
-                        (float)(mainModbusCom.DWORD(
-                            mainModbusCom.GetHoldingReg((int)mainModbusSetting["Value"][0]), 
-                            mainModbusCom.GetHoldingReg(((int)mainModbusSetting["Value"][0])+ 1)))
-                        ) + "}" ;
-                }
-            for (int i = 1; i < (int)mainModbusSetting["Value"].length(); i++) {
-                if((int)mainModbusSetting["Type"][i] == 0){
-                    DataAt += ",{\"key\":\""+ String((int)mainModbusSetting["Tag"][i]) + "\",\"value\":" + String(
-                        mainModbusCom.GetCoilReg((int)mainModbusSetting["Value"][i])) + "}" ;
-                }
-                if((int)mainModbusSetting["Type"][i] == 1){
-                    DataAt += ",{\"key\":\""+ String((int)mainModbusSetting["Tag"][i]) + "\",\"value\":" + String(
-                        mainModbusCom.GetHoldingReg((int)mainModbusSetting["Value"][i])) + "}" ;
-                }
-                if((int)mainModbusSetting["Type"][i] == 2){
-                    uint32_t dwordValue = mainModbusCom.DWORD(
-                        mainModbusCom.GetHoldingReg((int)mainModbusSetting["Value"][i]),
-                        mainModbusCom.GetHoldingReg(((int)mainModbusSetting["Value"][i]) + 1));
-                    DataAt += ",{\"key\":\""+ String((int)mainModbusSetting["Tag"][i]) + "\",\"value\":\"" + String(dwordValue) + "}" ;
-                }
-                if((int)mainModbusSetting["Type"][i] == 3){
-                    DataAt += ",{\"key\":\""+ String((int)mainModbusSetting["Tag"][i]) + "\",\"value\":\"" + String(
-                        (float)(mainModbusCom.DWORD(
-                            mainModbusCom.GetHoldingReg((int)mainModbusSetting["Value"][i]), 
-                            mainModbusCom.GetHoldingReg(((int)mainModbusSetting["Value"][i])+ 1)))
-                        ) + "}" ;
-                }
-            }
+            DataAt = createJsonForMqttt();
             payloadSent = "{\"connId\":\"" + String(conId) + "\",\"data\":[" + DataAt + "],\"exeAt\":\"" + String(TimeAt)+"\"}";
             MQTTwifiConfig.MQTTPush(mqttTopic, payloadSent);payloadSent = "";
         }

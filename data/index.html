@@ -147,18 +147,25 @@
     <div id="mappingData" class="tab-content">
         <h2>Mapping Data</h2>
         <div style="margin-bottom: 20px;">
-            <label for="jsonMappingData" style="display: block; margin-bottom: 10px;">JSON Mapping Data:</label>
-            <textarea id="jsonMappingData" name="jsonMappingData" placeholder="Enter JSON data here" style="width: 100%; height: 150px; resize: vertical;"></textarea>
-            <button type="button" onclick="submitMappingData()">Submit Mapping Data</button>
+            <div style="display:none">
+                <label for="jsonMappingData" style="display: block; margin-bottom: 10px;">JSON Mapping Data:</label>
+                <textarea id="jsonMappingData" name="jsonMappingData" placeholder="Enter JSON data here" style="width: 100%; height: 150px; resize: vertical;"></textarea>
+                <textarea id="jsonMappingDatas" name="jsonMappingDatas" placeholder="Enter JSON data here" style=" width: 100%; height: 150px; resize: vertical;"></textarea>
+                <button type="button" onclick="saveDataMapping()" >Save Mapping Data</button>
+                <button type="button" onclick="loadDataMapping()" >load Mapping Data</button>
+                <button type="button" onclick="submitMappingData()">Submit Mapping Data</button>
+            </div>
+            
+            </div>
             <div id="nodeDataTables"></div>
             <!-- Data tables for nodes will be dynamically generated here -->
         </div>
-    </div>
+    
         <script>
 
             function submitMappingData() {
                 const jsonData = document.getElementById('jsonMappingData').value;
-                loadNodeDashboard();
+                loadNodeDashboard(jsonData);
                 try {
                     const parsedData = JSON.parse(jsonData);
                     console.log('Submitting Mapping Data:', parsedData);
@@ -287,507 +294,6 @@
         </form>
     </div>
 
-    <script>
-         // Load LoRa RY Configuration
-        function loadLoRaRYConfig() {
-            fetch('/load-lora-config')
-                // .then(response => response.json())
-                // .then(data => {
-                //     document.getElementById('ryMode').value = data.mode || '0';
-                //     document.getElementById('ryRxTime').value = data.rxTime || '';
-                //     document.getElementById('ryLowSpeedTime').value = data.lowSpeedTime || '';
-                //     document.getElementById('ryBand').value = data.band || '';
-                //     document.getElementById('ryPower').value = data.power || '';
-                //     document.getElementById('ryAddress').value = data.address || '';
-                //     document.getElementById('ryNetworkId').value = data.networkId || '';
-                    // document.getElementById('LoRaEnable').checked = data.LoRaEnable || false;
-                // })
-                // .catch(error => console.error('Error loading LoRa RY config:', error));
-        }
-
-        // Submit LoRa RY Configuration
-        function submitLoRaRYConfig() {
-            const form = document.getElementById('loraRYConfigForm');
-            const loraRYConfig = {
-                LoRaEnable: document.getElementById('LoRaEnable').checked,
-                mode: parseInt(form.ryMode.value),
-                rxTime: parseInt(form.ryRxTime.value),
-                lowSpeedTime: parseInt(form.ryLowSpeedTime.value),
-                band: parseInt(form.ryBand.value),
-                power: parseInt(form.ryPower.value),
-                address: parseInt(form.ryAddress.value),
-                networkId: parseInt(form.ryNetworkId.value)
-            };
-
-            console.log('Submitting LoRa RY config:', loraRYConfig);
-
-            fetch('/configure-lora', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(loraRYConfig)
-            })
-            .then(response => response.json())
-            .then(data => {
-                console.log('Response from server:', data);
-                alert(data.status || 'LoRa RY configuration saved successfully!');
-            })
-            .catch(error => console.error('Error submitting LoRa RY config:', error));
-        }
-        
-        function submitLoRaConfig() {
-            const form = document.getElementById('loraConfigForm');
-            const loraConfig = {
-                address: parseInt(form.address.value),
-                uart_speed: form.uartSpeed.value,
-                air_data_rate: form.airRate.value,
-                channel: parseInt(form.channel.value),
-                transmission_mode: form.transmissionMode.value,
-                pull_up: form.pullUp.checked,
-                fec: form.fec.checked,
-                power: parseInt(form.power.value)
-            };
-
-            console.log('Submitting LoRa E32 config:', loraConfig);
-
-            fetch('/configure-e32', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(loraConfig)
-            })
-            .then(response => response.json())
-            .then(data => {
-                console.log('Response from server:', data);
-                alert(data.status || 'LoRa E32 configuration saved successfully!');
-            })
-            .catch(error => console.error('Error submitting LoRa E32 config:', error));
-        }
-    </script>
-    <div id="meshConfig" class="tab-content active">
-        <div style="display: flex; gap: 20px;">
-            <!-- Configuration Card -->
-            <div style="flex: 1; border: 1px solid #ddd; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
-                <h2>Mesh Network Configuration</h2>
-                <form id="meshConfigForm">
-                    <div style="margin-bottom: 10px;">
-                        <label for="boardModel" style="display: inline-block; width: 150px;">Board Model:</label>
-                        <select id="boardModel" name="boardModel" style="width: 200px;">
-                            <option value="0">Board ModRTUMesh</option>
-                            <option value="1">Board 410WER</option>
-                            <option value="2">Board LklineGw</option>
-                            <option value="3">Board LklineNode</option>
-                        </select>
-                    </div>
-                    <div style="margin-bottom: 10px;">
-                        <label for="brokerAddress" style="display: inline-block; width: 150px;">Broker MAC Address:</label>
-                        <input type="text" id="brokerAddress" name="brokerAddress" placeholder="FF:FF:FF:FF:FF:FF" style="width: 200px;">
-                    </div>
-                    <div style="margin-bottom: 10px;">
-                        <label for="wifiChannel" style="display: inline-block; width: 150px;">WiFi Channel:</label>
-                        <select id="wifiChannel" name="wifiChannel" style="width: 200px;">
-                            <option value="1">Channel 1</option>
-                            <option value="2">Channel 2</option>
-                            <option value="3">Channel 3</option>
-                            <option value="4">Channel 4</option>
-                            <option value="5">Channel 5</option>
-                            <option value="6">Channel 6</option>
-                            <option value="7">Channel 7</option>
-                            <option value="8">Channel 8</option>
-                            <option value="9">Channel 9</option>
-                            <option value="10">Channel 10</option>
-                            <option value="11">Channel 11</option>
-                            <option value="12">Channel 12</option>
-                        </select>
-                    </div>
-                    <div style="margin-bottom: 10px;">
-                        <label for="nodeId" style="display: inline-block; width: 150px;">Node ID:</label>
-                        <input type="number" id="nodeId" name="nodeId" placeholder="Enter Node ID" style="width: 200px;">
-                    </div>
-                    <div style="margin-bottom: 10px;">
-                        <label for="netId" style="display: inline-block; width: 150px;">Network ID:</label>
-                        <input type="number" id="netId" name="netId" placeholder="Enter Network ID" style="width: 200px;">
-                    </div>
-                    <div style="margin-bottom: 10px;">
-                        <label for="meshrole" style="display: inline-block; width: 150px;">Role:</label>
-                        <select id="meshrole" name="meshrole" style="width: 200px;">
-                            <option value="Broker">Broker</option>
-                            <option value="Node">Node</option>
-                            <option value="Repeater">Repeater</option>
-                        </select>
-                    </div>
-                    <div style="margin-bottom: 10px;">
-                        <label for="debug" style="display: inline-block; width: 150px;">Debug:</label>
-                        <input type="checkbox" id="debug" name="debug">
-                    </div>
-                    <div style="margin-bottom: 10px;">
-                        <label for="loraEnb" style="display: inline-block; width: 150px;">LoRa enable:</label>
-                        <input type="checkbox" id="loraEnb" name="loraEnb">
-                    </div>
-                    <div style="margin-bottom: 10px;">
-                        <label for="macSlaves" style="display: inline-block; width: 150px;">Slave MAC Addresses:</label>
-                        <input type="text" id="macSlaves" name="macSlaves" placeholder="Comma-separated MACs" style="width: 200px;">
-                    </div>
-                    <div style="margin-bottom: 10px;">
-                        <label for="classDataRequest" style="display: inline-block; width: 150px;">Class Data Request:</label>
-                        <select id="classDataRequest" name="classDataRequest" style="width: 200px;">
-                            <option value="A">Class A</option>
-                            <option value="B">Class B</option>
-                            <option value="C">Class C</option>
-                        </select>
-                    </div>
-                    <div style="margin-bottom: 10px;">
-                        <label for="communicationTime" style="display: inline-block; width: 150px;">Communication Time (ClassB):</label>
-                        <input type="number" id="communicationTime" name="communicationTime" placeholder="Enter Time (ms)" style="width: 200px;" min="0">
-                    </div>
-                    <div style="margin-bottom: 10px;">
-                        <label for="dataVersion" style="display: inline-block; width: 150px;">Data Version:</label>
-                        <select id="dataVersion" name="dataVersion" style="width: 200px;">
-                            <option value="0">Lookline v1</option>
-                            <option value="1">Lookline v2</option>
-                            <option value="2">Modbus Register</option>
-                            <option value="3">Serial TTL</option>
-                        </select>
-                    </div>
-                    <button type="button" onclick="submitMeshConfig()">Submit</button>
-                </form>
-            </div>
-
-            <!-- Dashboard Card -->
-            <div style="flex: 2; border: 1px solid #ddd; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
-                
-                <div id="nodeDashboard" style="display: flex; flex-wrap: wrap; gap: 20px;">
-                    
-                    <!-- Example Node Card -->
-                    <!-- Node cards will be dynamically generated here -->
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        let socket = new WebSocket("ws://" + document.location.hostname + "/ws");
-
-            socket.onopen = () => {
-                console.log('WebSocket connection established.');
-                updateSocketStatus(true);
-                socket.send(JSON.stringify({ type: 'subscribe', topic: 'nodeDashboard' }));
-            };
-            
-            socket.onmessage = (event) => {
-                    console.log('Received:', event.data);
-                if(event.data[0] == '{'){
-                    const data = JSON.parse(event.data);
-                    console.log('Received data:', data);
-                    if (data.type === 'nodeDashboard') {
-                        updateNodeDashboard(data.payload);
-                    }
-                }
-            };
-            
-            socket.onerror = (error) => {
-                console.error('WebSocket error:', error);
-            };
-
-            socket.onclose = () => {
-                console.log('WebSocket connection closed.');
-                updateSocketStatus(false);
-                setTimeout(() => {
-                    console.log('Attempting to reconnect WebSocket...');
-                    socket = new WebSocket("ws://" + document.location.hostname + "/ws");
-                }, 5000); // Reconnect after 5 seconds
-            }
-        function updateSocketStatus(connected) {
-            const statusElement = document.getElementById('socketStatus');
-            if (statusElement) {
-                statusElement.textContent = connected ? 'Connected' : 'Disconnected';
-                statusElement.style.color = connected ? 'green' : 'red';
-            } else {
-                console.warn('Socket status element not found.');
-            }
-        }
-        function loadNodeDashboard(JsonData = '[]') {
-            let nodes = [];
-            try {
-                nodes = JSON.parse(JsonData);
-            } catch (error) {
-                console.error("Invalid JSON data:", error);
-                return;
-            }
-            try {
-                nodes = JSON.parse(JsonData);
-            } catch (error) {
-                console.error("Invalid JSON data:", error);
-                return;
-            }
-            const dashboard = document.getElementById('nodeDashboard');
-            dashboard.innerHTML = "\
-            <div style=\"width: 100%; display: flex; justify-content: space-between; align-items: center; background-color: #f4f4f4; padding: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);\">\
-                        <h3 style=\"margin: 0;\">Node Dashboard</h3>\
-                        <div style=\"font-size: 14px; color: #555;\">Manage and monitor your nodes</div>\
-                    </div>\
-                        <div id=\"socketStatus\" style=\"width: 100%; display: flex; justify-content: space-between; align-items: center;font-size: 14px; margin-bottom: 10px; font-weight: bold; color: red; text-align: center;\">Disconnected</div>\
-                        ";
-
-            nodes.forEach(node => {
-                const card = document.createElement('div');
-                card.style.border = '1px solid #ddd';
-                card.style.padding = '15px';
-                card.style.borderRadius = '8px';
-                card.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-                card.style.width = 'calc(33% - 20px)';
-                card.style.boxSizing = 'border-box';
-
-                card.innerHTML = `
-                    <h3>Node ${node.nodeId}</h3>
-                    <p><strong>MAC:</strong> ${node.mac}</p>
-                    <p><strong>Net ID:</strong> ${node.netId}</p>
-                    <p><strong>Success Rate:</strong> ${node.successRate}</p>
-                    <p><strong>Last Seen:</strong> ${node.timeAgo}</p>
-                `;
-
-                dashboard.appendChild(card);
-            });
-
-            nodes.forEach(node => {
-                const nodeId = node.nodeId;
-                const dataSize = Math.min(node.data.length, 200); // Limit to 200 bytes
-                const keyData = node.keys || Array.from({ length: type }, (_, i) => `Key${i + 1}`);
-                const typeData = node.type || Array.from({ length: type }, () => '-');
-                if (!document.getElementById(`node_${nodeId}_dataTable`)) {
-                    createNodeDataTable(nodeId, dataSize, keyData, typeData);
-                    const table = document.getElementById(`node_${nodeId}_dataTable`);
-                    const headerRow = table.querySelector('thead tr');
-                    if (!headerRow.querySelector('th[data-type="type"]')) {
-                        const typeHeader = document.createElement('th');
-                        typeHeader.textContent = 'Data Type';
-                        typeHeader.setAttribute('data-type', 'type');
-                        headerRow.appendChild(typeHeader);
-                    }
-
-                    const rows = table.querySelectorAll('tbody tr');
-                    rows.forEach((row, index) => {
-                        const typeCell = document.createElement('td');
-                        typeCell.textContent = node.type[index % node.type.length] || '-';
-                        row.appendChild(typeCell);
-                    });
-                }
-
-                const formattedData = [];
-                let dataIndex = 0;
-
-                node.type.forEach(type => {
-                    if (type === "COILS") {
-                        formattedData.push(node.data[dataIndex] ? 1 : 0);
-                        dataIndex += 1;
-                    } else if (type === "WORD") {
-                        const word = (node.data[dataIndex] << 8) | node.data[dataIndex + 1];
-                        formattedData.push(word);
-                        dataIndex += 2;
-                    } else if (type === "DWORD") {
-                        const dword = (node.data[dataIndex] << 24) | (node.data[dataIndex + 1] << 16) | (node.data[dataIndex + 2] << 8) | node.data[dataIndex + 3];
-                        formattedData.push(dword);
-                        dataIndex += 4;
-                    } else if (type === "FLOAT") {
-                        const buffer = new ArrayBuffer(4);
-                        const view = new DataView(buffer);
-                        view.setUint8(0, node.data[dataIndex]);
-                        view.setUint8(1, node.data[dataIndex + 1]);
-                        view.setUint8(2, node.data[dataIndex + 2]);
-                        view.setUint8(3, node.data[dataIndex + 3]);
-                        formattedData.push(view.getFloat32(0));
-                        dataIndex += 4;
-                    }
-                });
-
-                updateNodeData(nodeId, formattedData);
-            });
-            // };
-
-        }
-        function createNodeDataTable(nodeId, dataSize, keyData, typeData) {
-            const container = document.getElementById('nodeDataTables');
-            const tableDiv = document.createElement('div');
-            tableDiv.style.marginBottom = '20px';
-
-            tableDiv.innerHTML = `
-                <h3>Node ${nodeId} Data</h3>
-                <table id="node_${nodeId}_dataTable" style="width: 100%; border-collapse: collapse;">
-                    <thead>
-                        <tr>
-                            <th>Index</th>
-                            <th>Key</th>
-                            <th>Type</th>
-                            <th>Data</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${Array.from({ length: dataSize }, (_, i) => `
-                            <tr>
-                                <td>${i}</td>
-                                <td>${keyData && keyData[i] ? keyData[i] : '-'}</td>
-                                <td>${typeData && typeData[i] ? typeData[i] : '-'}</td>
-                                <td id="node_${nodeId}_data_${i}">-</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            `;
-
-            container.appendChild(tableDiv);
-            }
-
-            function updateNodeData(nodeId, data) {
-                data.forEach((value, index) => {
-                    const cell = document.getElementById(`node_${nodeId}_data_${index}`);
-                    if (cell) {
-                        cell.textContent = value;
-                    }
-                });
-            }
-    </script>
-        
-    
-    <div id="wifiConfig" class="tab-content">
-        <h2>WiFi Configuration</h2>
-        <form id="wifiConfigForm">
-            <div style="margin-bottom: 10px;">
-                <label for="wifiMode" style="display: inline-block; width: 150px;">WiFi Mode:</label>
-                <select id="wifiMode" name="wifiMode" style="width: 200px;">
-                    <option value="STA">Station (STA)</option>
-                    <option value="AP">Access Point (AP)</option>
-                </select>
-            </div>
-            <div style="margin-bottom: 10px;">
-                <label for="ssid" style="display: inline-block; width: 150px;">SSID:</label>
-                <input type="text" id="ssid" name="ssid" placeholder="Enter SSID" style="width: 200px;">
-            </div>
-            <div style="margin-bottom: 10px;">
-                <label for="password" style="display: inline-block; width: 150px;">Password:</label>
-                <input type="password" id="password" name="password" placeholder="Enter Password" style="width: 200px;">
-            </div>
-            <hr style="margin: 20px 0; border: 1px solid #ddd;">
-
-            <h2>MQTT Configuration</h2>
-            <div style="margin-bottom: 10px;">
-                <label for="mqttEnable" style="display: inline-block; width: 150px;">Enable MQTT:</label>
-                <input type="checkbox" id="mqttEnable" name="mqttEnable">
-            </div>
-            <div style="margin-bottom: 10px;">
-                <label for="mqttHost" style="display: inline-block; width: 150px;">MQTT Host:</label>
-                <input type="text" id="mqttHost" name="mqttHost" placeholder="Enter MQTT Host" style="width: 200px;">
-            </div>
-            <div style="margin-bottom: 10px;">
-                <label for="mqttPort" style="display: inline-block; width: 150px;">MQTT Port:</label>
-                <input type="number" id="mqttPort" name="mqttPort" placeholder="Enter MQTT Port" style="width: 200px;">
-            </div>
-            <div style="margin-bottom: 10px;">
-                <label for="mqttUser" style="display: inline-block; width: 150px;">MQTT User:</label>
-                <input type="text" id="mqttUser" name="mqttUser" placeholder="Enter MQTT User" style="width: 200px;">
-            </div>
-            <div style="margin-bottom: 10px;">
-                <label for="mqttPass" style="display: inline-block; width: 150px;">MQTT Password:</label>
-                <input type="password" id="mqttPass" name="mqttPass" placeholder="Enter MQTT Password" style="width: 200px;">
-            </div>
-            <div style="margin-bottom: 10px;">
-                <label for="conId" style="display: inline-block; width: 150px;">Connection ID:</label>
-                <input type="text" id="conId" name="conId" placeholder="Enter Connection ID" style="width: 200px;">
-            </div>
-            <div style="margin-bottom: 10px;">
-                <label for="topicPush" style="display: inline-block; width: 150px;">Topic Push:</label>
-                <input type="text" id="topicPush" name="topicPush" placeholder="Enter Topic Push" style="width: 200px;">
-            </div>
-            <div style="margin-bottom: 10px;">
-                <label for="topicSub" style="display: inline-block; width: 150px;">Topic Subscribe:</label>
-                <input type="text" id="topicSub" name="topicSub" placeholder="Enter Topic Subscribe" style="width: 200px;">
-            </div>
-            <div style="margin-bottom: 10px;">
-                <label for="mqttKeepAlive" style="display: inline-block; width: 150px;">MQTT Keep Alive:</label>
-                <input type="number" id="mqttKeepAlive" name="mqttKeepAlive" placeholder="Enter Keep Alive" style="width: 200px;">
-            </div>
-            <div style="margin-bottom: 10px;">
-                <label for="mqttCleanSession" style="display: inline-block; width: 150px;">Clean Session:</label>
-                <input type="checkbox" id="mqttCleanSession" name="mqttCleanSession">
-            </div>
-            <div style="margin-bottom: 10px;">
-                <label for="mqttQos" style="display: inline-block; width: 150px;">MQTT QoS:</label>
-                <select id="mqttQos" name="mqttQos" style="width: 200px;">
-                    <option value="0">QoS 0</option>
-                    <option value="1">QoS 1</option>
-                    <option value="2">QoS 2</option>
-                </select>
-            </div>
-            <div style="margin-bottom: 10px;">
-                <label for="mqttLwtTopic" style="display: inline-block; width: 150px;">MQTT Retain:</label>
-                <input type="checkbox" id="mqttRetain" name="mqttRetain">
-            </div>
-        </br>
-            <div style="margin-bottom: 10px;">
-                <label for="mqttLwtTopic" style="display: inline-block; width: 150px;">LWT Topic:</label>
-                <input type="text" id="mqttLwtTopic" name="mqttLwtTopic" placeholder="Enter LWT Topic" style="width: 200px;">
-            </div>
-            <div style="margin-bottom: 10px;">
-                <label for="mqttLwtMessage" style="display: inline-block; width: 150px;">LWT Message:</label>
-                <input type="text" id="mqttLwtMessage" name="mqttLwtMessage" placeholder="Enter LWT Message" style="width: 200px;">
-            </div>
-            <div style="margin-bottom: 10px;">
-                <label for="mqttLwtQos" style="display: inline-block; width: 150px;">LWT QoS:</label>
-                <select id="mqttLwtQos" name="mqttLwtQos" style="width: 200px;">
-                    <option value="0">QoS 0</option>
-                    <option value="1">QoS 1</option>
-                    <option value="2">QoS 2</option>
-                </select>
-            </div>
-            <div style="margin-bottom: 10px;">
-                <label for="mqttLwtRetain" style="display: inline-block; width: 150px;">LWT Retain:</label>
-                <input type="checkbox" id="mqttLwtRetain" name="mqttLwtRetain">
-            </div>
-            <div style="margin-bottom: 10px;">
-                <label for="mqttLwtEnabled" style="display: inline-block; width: 150px;">LWT Enabled:</label>
-                <input type="checkbox" id="mqttLwtEnabled" name="mqttLwtEnabled">
-            </div>
-        </br>
-        <hr style="margin: 20px 0; border: 1px solid #ddd;">
-        <div style="margin-bottom: 10px;">
-            <label for="timezone" style="display: inline-block; width: 150px;">Timezone:</label>
-            <select id="timezone" name="timezone" style="width: 200px;">
-                <option value="0">UTC</option>
-                <option value="1">UTC+1</option>
-                <option value="2">UTC+2</option>
-                <option value="3">UTC+3</option>
-                <option value="4">UTC+4</option>
-                <option value="5">UTC+5</option>
-                <option value="6">UTC+6</option>
-                <option value="7">UTC+7</option>
-                <option value="8">UTC+8</option>
-                <option value="9">UTC+9</option>
-                <option value="10">UTC+10</option>
-                <option value="11">UTC+11</option>
-                <option value="12">UTC+12</option>
-                <option value="-1">UTC-1</option>
-                <option value="-2">UTC-2</option>
-                <option value="-3">UTC-3</option>
-                <option value="-4">UTC-4</option>
-                <option value="-5">UTC-5</option>
-                <option value="-6">UTC-6</option>
-                <option value="-7">UTC-7</option>
-                <option value="-8">UTC-8</option>
-                <option value="-9">UTC-9</option>
-                <option value="-10">UTC-10</option>
-                <option value="-11">UTC-11</option>
-                <option value="-12">UTC-12</option>
-            </select>
-        </div>
-        <button type="button" onclick="submitWiFiMQTTConfig()">Update</button>
-        </form>
-    </div>
-
-    <div id="mqttConfig" class="tab-content">
-        
-    </div>
-
     <div id="modbusConfig" class="tab-content">
         <h2>Modbus Configuration</h2>
         <form id="modbusConfigForm">
@@ -887,8 +393,462 @@
             <button onclick="uploadFile()">Upload</button>
         </div>
     </div>
+    <div id="meshConfig" class="tab-content active">
+        <div style="display: flex; gap: 20px;">
+            <!-- Configuration Card -->
+            <div style="flex: 1; border: 1px solid #ddd; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
+                <h2>Mesh Network Configuration</h2>
+                <form id="meshConfigForm">
+                    <div style="margin-bottom: 10px;">
+                        <label for="boardModel" style="display: inline-block; width: 150px;">Board Model:</label>
+                        <select id="boardModel" name="boardModel" style="width: 200px;">
+                            <option value="0">Board ModRTUMesh</option>
+                            <option value="1">Board 410WER</option>
+                            <option value="2">Board LklineGw</option>
+                            <option value="3">Board LklineNode</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <label for="brokerAddress" style="display: inline-block; width: 150px;">Broker MAC Address:</label>
+                        <input type="text" id="brokerAddress" name="brokerAddress" placeholder="FF:FF:FF:FF:FF:FF" style="width: 200px;">
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <label for="wifiChannel" style="display: inline-block; width: 150px;">WiFi Channel:</label>
+                        <select id="wifiChannel" name="wifiChannel" style="width: 200px;">
+                            <option value="1">Channel 1</option>
+                            <option value="2">Channel 2</option>
+                            <option value="3">Channel 3</option>
+                            <option value="4">Channel 4</option>
+                            <option value="5">Channel 5</option>
+                            <option value="6">Channel 6</option>
+                            <option value="7">Channel 7</option>
+                            <option value="8">Channel 8</option>
+                            <option value="9">Channel 9</option>
+                            <option value="10">Channel 10</option>
+                            <option value="11">Channel 11</option>
+                            <option value="12">Channel 12</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <label for="nodeId" style="display: inline-block; width: 150px;">Node ID:</label>
+                        <input type="number" id="nodeId" name="nodeId" placeholder="Enter Node ID" style="width: 200px;">
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <label for="netId" style="display: inline-block; width: 150px;">Network ID:</label>
+                        <input type="number" id="netId" name="netId" placeholder="Enter Network ID" style="width: 200px;">
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <label for="meshrole" style="display: inline-block; width: 150px;">Role:</label>
+                        <select id="meshrole" name="meshrole" style="width: 200px;">
+                            <option value="Broker">Broker</option>
+                            <option value="Node">Node</option>
+                            <option value="Repeater">Repeater</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <label for="debug" style="display: inline-block; width: 150px;">Debug:</label>
+                        <input type="checkbox" id="debug" name="debug">
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <label for="loraEnb" style="display: inline-block; width: 150px;">LoRa enable:</label>
+                        <input type="checkbox" id="loraEnb" name="loraEnb">
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <label for="macSlaves" style="display: inline-block; width: 150px;">Slave MAC Addresses:</label>
+                        <input type="text" id="macSlaves" name="macSlaves" placeholder="Comma-separated MACs" style="width: 200px;">
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <label for="classDataRequest" style="display: inline-block; width: 150px;">Class Data Request:</label>
+                        <select id="classDataRequest" name="classDataRequest" style="width: 200px;">
+                            <option value="A">Class A</option>
+                            <option value="B">Class B</option>
+                            <option value="C">Class C</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <label for="communicationTime" style="display: inline-block; width: 150px;">Communication Time (ClassB):</label>
+                        <input type="number" id="communicationTime" name="communicationTime" placeholder="Enter Time (ms)" style="width: 200px;" min="0">
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <label for="dataVersion" style="display: inline-block; width: 150px;">Data Version:</label>
+                        <select id="dataVersion" name="dataVersion" style="width: 200px;">
+                            <option value="0">Lookline v1</option>
+                            <option value="1">Lookline v2</option>
+                            <option value="2">Modbus Register</option>
+                            <option value="3">Serial TTL</option>
+                        </select>
+                    </div>
+                    <button type="button" onclick="submitMeshConfig()">Submit</button>
+                </form>
+            </div>
+
+            <!-- Dashboard Card -->
+             
+            <div style="flex: 2; border: 1px solid #ddd; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
+                
+            <div id="socketStatus" style="width: 100%; display: flex; justify-content: space-between; align-items: center;font-size: 14px; margin-bottom: 10px; font-weight: bold; color: red; text-align: center;">Disconnected</div>
+                <div id="nodeDashboard" style="display: flex; flex-wrap: wrap; gap: 20px;">
+                    
+                    <!-- Example Node Card -->
+                    <!-- Node cards will be dynamically generated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="wifiConfig" class="tab-content">
+        <h2>WiFi Configuration</h2>
+        <form id="wifiConfigForm">
+            <div style="margin-bottom: 10px;">
+                <label for="wifiMode" style="display: inline-block; width: 150px;">WiFi Mode:</label>
+                <select id="wifiMode" name="wifiMode" style="width: 200px;">
+                    <option value="STA">Station (STA)</option>
+                    <option value="AP">Access Point (AP)</option>
+                </select>
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="ssid" style="display: inline-block; width: 150px;">SSID:</label>
+                <input type="text" id="ssid" name="ssid" placeholder="Enter SSID" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="password" style="display: inline-block; width: 150px;">Password:</label>
+                <input type="password" id="password" name="password" placeholder="Enter Password" style="width: 200px;">
+            </div>
+            <hr style="margin: 20px 0; border: 1px solid #ddd;">
+
+            <h2>MQTT Configuration</h2>
+            <div style="margin-bottom: 10px;">
+                <label for="mqttEnable" style="display: inline-block; width: 150px;">Enable MQTT:</label>
+                <input type="checkbox" id="mqttEnable" name="mqttEnable">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="mqttHost" style="display: inline-block; width: 150px;">MQTT Host:</label>
+                <input type="text" id="mqttHost" name="mqttHost" placeholder="Enter MQTT Host" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="mqttPort" style="display: inline-block; width: 150px;">MQTT Port:</label>
+                <input type="number" id="mqttPort" name="mqttPort" placeholder="Enter MQTT Port" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="mqttUser" style="display: inline-block; width: 150px;">MQTT User:</label>
+                <input type="text" id="mqttUser" name="mqttUser" placeholder="Enter MQTT User" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="mqttPass" style="display: inline-block; width: 150px;">MQTT Password:</label>
+                <input type="password" id="mqttPass" name="mqttPass" placeholder="Enter MQTT Password" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="conId" style="display: inline-block; width: 150px;">Connection ID:</label>
+                <input type="text" id="conId" name="conId" placeholder="Enter Connection ID" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="topicPush" style="display: inline-block; width: 150px;">Topic Push:</label>
+                <input type="text" id="topicPush" name="topicPush" placeholder="Enter Topic Push" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="topicSub" style="display: inline-block; width: 150px;">Topic Subscribe:</label>
+                <input type="text" id="topicSub" name="topicSub" placeholder="Enter Topic Subscribe" style="width: 200px;">
+            <div style="margin-bottom: 10px;">
+                <label for="mqttKeepAlive" style="display: inline-block; width: 150px;">MQTT Keep Alive:</label>
+                <input type="number" id="mqttKeepAlive" name="mqttKeepAlive" placeholder="Enter Keep Alive" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="mqttCleanSession" style="display: inline-block; width: 150px;">Clean Session:</label>
+                <input type="checkbox" id="mqttCleanSession" name="mqttCleanSession">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="mqttQos" style="display: inline-block; width: 150px;">MQTT QoS:</label>
+                <select id="mqttQos" name="mqttQos" style="width: 200px;">
+                    <option value="0">QoS 0</option>
+                    <option value="1">QoS 1</option>
+                    <option value="2">QoS 2</option>
+                </select>
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="mqttLwtTopic" style="display: inline-block; width: 150px;">MQTT Retain:</label>
+                <input type="checkbox" id="mqttRetain" name="mqttRetain">
+            </div>
+        </br>
+            <div style="margin-bottom: 10px;">
+                <label for="mqttLwtTopic" style="display: inline-block; width: 150px;">LWT Topic:</label>
+                <input type="text" id="mqttLwtTopic" name="mqttLwtTopic" placeholder="Enter LWT Topic" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="mqttLwtMessage" style="display: inline-block; width: 150px;">LWT Message:</label>
+                <input type="text" id="mqttLwtMessage" name="mqttLwtMessage" placeholder="Enter LWT Message" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="mqttLwtQos" style="display: inline-block; width: 150px;">LWT QoS:</label>
+                <select id="mqttLwtQos" name="mqttLwtQos" style="width: 200px;">
+                    <option value="0">QoS 0</option>
+                    <option value="1">QoS 1</option>
+                    <option value="2">QoS 2</option>
+                </select>
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="mqttLwtRetain" style="display: inline-block; width: 150px;">LWT Retain:</label>
+                <input type="checkbox" id="mqttLwtRetain" name="mqttLwtRetain">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="mqttLwtEnabled" style="display: inline-block; width: 150px;">LWT Enabled:</label>
+                <input type="checkbox" id="mqttLwtEnabled" name="mqttLwtEnabled">
+            </div>
+        </br>
+        <hr style="margin: 20px 0; border: 1px solid #ddd;">
+        <div style="margin-bottom: 10px;">
+            <label for="timezone" style="display: inline-block; width: 150px;">Timezone:</label>
+            <select id="timezone" name="timezone" style="width: 200px;">
+                <option value="0">UTC</option>
+                <option value="1">UTC+1</option>
+                <option value="2">UTC+2</option>
+                <option value="3">UTC+3</option>
+                <option value="4">UTC+4</option>
+                <option value="5">UTC+5</option>
+                <option value="6">UTC+6</option>
+                <option value="7">UTC+7</option>
+                <option value="8">UTC+8</option>
+                <option value="9">UTC+9</option>
+                <option value="10">UTC+10</option>
+                <option value="11">UTC+11</option>
+                <option value="12">UTC+12</option>
+                <option value="-1">UTC-1</option>
+                <option value="-2">UTC-2</option>
+                <option value="-3">UTC-3</option>
+                <option value="-4">UTC-4</option>
+                <option value="-5">UTC-5</option>
+                <option value="-6">UTC-6</option>
+                <option value="-7">UTC-7</option>
+                <option value="-8">UTC-8</option>
+                <option value="-9">UTC-9</option>
+                <option value="-10">UTC-10</option>
+                <option value="-11">UTC-11</option>
+                <option value="-12">UTC-12</option>
+            </select>
+        </div>
+        <button type="button" onclick="submitWiFiMQTTConfig()">Update</button>
+        </form>
+    </div>
+
 </CENTER>
     <script>
+
+            var gateway = `ws://${window.location.hostname}/ws`;
+            var websocket;
+            window.addEventListener('load', onLoad);
+
+            function initWebSocket() {
+                console.log('Trying to open a WebSocket connection...');
+                websocket = new WebSocket(gateway);
+                websocket.onopen    = onOpen;
+                websocket.onclose   = onClose;
+                websocket.onmessage = onMessage; // <-- add this line
+            }
+
+            function onOpen(event) {
+                console.log('WebSocket connection established.');
+                updateSocketStatus(true);
+                websocket.send(JSON.stringify({ type: 'subscribe', topic: 'nodeDashboard' }));
+            }
+            function onClose(event) {
+                console.log('Connection closed');
+                setTimeout(initWebSocket, 2000);
+            }
+
+            function onLoad(event) {
+                initWebSocket();
+            }
+            
+            function onMessage(event){
+                    console.log('Received:', event.data);
+                if((event.data[0] == '[' || event.data[0] == '{') && event.data != "undefined"){
+                    const data = JSON.parse(event.data);
+                    console.log('Received data:', data);
+                    loadNodeDashboard(event.data);
+                    document.getElementById('jsonMappingData').value = event.data;
+                }
+            };
+            
+            // websocket.onerror = (error) => {
+            //     console.error('WebSocket error:', error);
+            // };
+
+            function onClose(){
+                console.log('WebSocket connection closed.');
+                updateSocketStatus(false);
+                setTimeout(initWebSocket, 2000);
+            }
+            
+        function updateSocketStatus(connected) {
+            let statusElement = document.getElementById('socketStatus');
+            if (!statusElement) {
+                statusElement = document.createElement('div');
+                statusElement.id = 'socketStatus';
+                statusElement.style.fontWeight = 'bold';
+                statusElement.style.textAlign = 'center';
+                document.body.prepend(statusElement);
+            }
+            statusElement.textContent = connected ? 'Connected' : 'Disconnected';
+            statusElement.style.color = connected ? 'green' : 'red';
+        }
+        function loadDataMapping() {
+            fetch('/data-mapping')
+                .then(response => response.json())
+                .then(data => {
+                    const jsonData = JSON.stringify(data, null, 2); // Format JSON with indentation
+                    document.getElementById('jsonMappingDatas').value = jsonData;
+                    console.log('Loaded data mapping:', data);
+                })
+                .catch(error => console.error('Error loading data mapping:', error));
+        }
+
+        function saveDataMapping() {
+            const jsonData = document.getElementById('jsonMappingDatas').value;
+            try {
+                const parsedData = JSON.parse(jsonData); // Validate JSON format
+                fetch('/save-data-mapping', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(parsedData),
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('Saved data mapping:', data);
+                        alert(data.status || 'Data mapping saved successfully!');
+                    })
+                    .catch(error => console.error('Error saving data mapping:', error));
+            } catch (error) {
+                alert('Invalid JSON format. Please correct it and try again.');
+                console.error('JSON Parsing Error:', error);
+            }
+        }
+
+        function loadNodeDashboard(JsonData) {
+            let nodes = [];
+            try {
+                nodes = JSON.parse(JsonData);
+            } catch (error) {
+                console.error("Invalid JSON data:", error);
+                return;
+            }
+            try {
+                nodes = JSON.parse(JsonData);
+            } catch (error) {
+                console.error("Invalid JSON data:", error);
+                return;
+            }
+            
+            const dashboard = document.getElementById('nodeDashboard');
+            dashboard.innerHTML = "\
+            <div style=\"width: 100%; display: flex; justify-content: space-between; align-items: center; background-color: #f4f4f4; padding: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);\">\
+                        <h3 style=\"margin: 0;\">Node Dashboard</h3>\
+                        <div style=\"font-size: 14px; color: #555;\">Manage and monitor your nodes</div>\
+                    </div>\
+                        ";
+
+            nodes.forEach(node => {
+                // createDynamicTable(node.nodeId, node.data);
+                const card = document.createElement('div');
+                card.style.border = '1px solid #ddd';
+                card.style.padding = '15px';
+                card.style.borderRadius = '8px';
+                card.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                card.style.width = 'calc(33% - 20px)';
+                card.style.boxSizing = 'border-box';
+
+                card.innerHTML = `
+                    <h3>Node ${node.nodeId}</h3>
+                    <p><strong>MAC:</strong> ${node.mac}</p>
+                    <p><strong>Net ID:</strong> ${node.netId}</p>
+                    <p><strong>Success Rate:</strong> ${node.successRate}</p>
+                    <p><strong>Last Seen:</strong> ${node.timeAgo}</p>
+                `;
+
+                dashboard.appendChild(card);
+            });
+
+            nodes.forEach(node => {
+                const nodeId = node.nodeId;
+                const dataSize = Math.min(node.data.length, 200); // Limit to 200 bytes
+                const keyData = node.keys || Array.from({ length: type }, (_, i) => `Key${i + 1}`);
+                const typeData = node.type || Array.from({ length: type }, () => '-');
+                if (!document.getElementById(`node_${nodeId}_dataTable`)) {
+                    createNodeDataTable(nodeId, dataSize, keyData, typeData);
+                }
+
+                const formattedData = [];
+                let dataIndex = 0;
+
+                node.type.forEach(type => {
+                    if (type === "COILS") {
+                        formattedData.push(node.data[dataIndex] ? 1 : 0);
+                        dataIndex += 1;
+                    } else if (type === "WORD") {
+                        const word = (node.data[dataIndex] << 8) | node.data[dataIndex + 1];
+                        formattedData.push(word);
+                        dataIndex += 2;
+                    } else if (type === "DWORD") {
+                        const dword = (node.data[dataIndex] << 24) | (node.data[dataIndex + 1] << 16) | (node.data[dataIndex + 2] << 8) | node.data[dataIndex + 3];
+                        formattedData.push(dword);
+                        dataIndex += 4;
+                    } else if (type === "FLOAT") {
+                        const buffer = new ArrayBuffer(4);
+                        const view = new DataView(buffer);
+                        view.setUint8(0, node.data[dataIndex]);
+                        view.setUint8(1, node.data[dataIndex + 1]);
+                        view.setUint8(2, node.data[dataIndex + 2]);
+                        view.setUint8(3, node.data[dataIndex + 3]);
+                        formattedData.push(view.getFloat32(0));
+                        dataIndex += 4;
+                    }
+                });
+
+                updateNodeData(nodeId, formattedData);
+            });
+            // });
+            // };
+
+        }
+        function createNodeDataTable(nodeId, dataSize, keyData, typeData) {
+            const container = document.getElementById('nodeDataTables');
+            const tableDiv = document.createElement('div');
+            tableDiv.style.marginBottom = '20px';
+
+            tableDiv.innerHTML = `
+                <h3>Node ${nodeId} Data</h3>
+                <table id="node_${nodeId}_dataTable" style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr>
+                            <th>Index</th>
+                            <th>Key</th>
+                            <th>Type</th>
+                            <th>Data</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${Array.from({ length: dataSize }, (_, i) => `
+                            <tr>
+                                <td>${i}</td>
+                                <td>${keyData && keyData[i] ? keyData[i] : '-'}</td>
+                                <td>${typeData && typeData[i] ? typeData[i] : '-'}</td>
+                                <td id="node_${nodeId}_data_${i}">-</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+
+            container.appendChild(tableDiv);
+            }
+
+            function updateNodeData(nodeId, data) {
+                data.forEach((value, index) => {
+                    const cell = document.getElementById(`node_${nodeId}_data_${index}`);
+                    if (cell) {
+                        cell.textContent = value;
+                    }
+                });
+            }
          // Tab switching logic
          function showTab(tabId) {
             const tabs = document.querySelectorAll('.tab');
@@ -1107,7 +1067,8 @@
             loadWiFiMQTTConfig();
             loadMeshConfig();
             loadLoRaRYConfig();
-            loadNodeDashboard();
+            loadDataMapping();
+            // loadNodeDashboard();
         };
 
 
@@ -1232,6 +1193,84 @@
 
         // Fetch the file list on page load
         fetchFileList();
+
+         // Load LoRa RY Configuration
+        function loadLoRaRYConfig() {
+            fetch('/load-lora-config')
+                .then(response => response.json())
+                .then(data => {
+                //     document.getElementById('ryMode').value = data.mode || '0';
+                //     document.getElementById('ryRxTime').value = data.rxTime || '';
+                //     document.getElementById('ryLowSpeedTime').value = data.lowSpeedTime || '';
+                //     document.getElementById('ryBand').value = data.band || '';
+                //     document.getElementById('ryPower').value = data.power || '';
+                //     document.getElementById('ryAddress').value = data.address || '';
+                //     document.getElementById('ryNetworkId').value = data.networkId || '';
+                    // document.getElementById('LoRaEnable').checked = data.LoRaEnable || false;
+                })
+                .catch(error => console.error('Error loading LoRa RY config:', error));
+        }
+
+        // Submit LoRa RY Configuration
+        function submitLoRaRYConfig() {
+            const form = document.getElementById('loraRYConfigForm');
+            const loraRYConfig = {
+                LoRaEnable: document.getElementById('LoRaEnable').checked,
+                mode: parseInt(form.ryMode.value),
+                rxTime: parseInt(form.ryRxTime.value),
+                lowSpeedTime: parseInt(form.ryLowSpeedTime.value),
+                band: parseInt(form.ryBand.value),
+                power: parseInt(form.ryPower.value),
+                address: parseInt(form.ryAddress.value),
+                networkId: parseInt(form.ryNetworkId.value)
+            };
+
+            console.log('Submitting LoRa RY config:', loraRYConfig);
+
+            fetch('/configure-lora', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(loraRYConfig)
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Response from server:', data);
+                alert(data.status || 'LoRa RY configuration saved successfully!');
+            })
+            .catch(error => console.error('Error submitting LoRa RY config:', error));
+        }
+        
+        function submitLoRaConfig() {
+            const form = document.getElementById('loraConfigForm');
+            const loraConfig = {
+                address: parseInt(form.address.value),
+                uart_speed: form.uartSpeed.value,
+                air_data_rate: form.airRate.value,
+                channel: parseInt(form.channel.value),
+                transmission_mode: form.transmissionMode.value,
+                pull_up: form.pullUp.checked,
+                fec: form.fec.checked,
+                power: parseInt(form.power.value)
+            };
+
+            console.log('Submitting LoRa E32 config:', loraConfig);
+
+            fetch('/configure-e32', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(loraConfig)
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Response from server:', data);
+                alert(data.status || 'LoRa E32 configuration saved successfully!');
+            })
+            .catch(error => console.error('Error submitting LoRa E32 config:', error));
+        }
     </script>
 </body>
 </html>

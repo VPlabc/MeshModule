@@ -14,10 +14,13 @@
 
 extern bool mqttEnable;
 extern String wifiMode;
+extern bool socketConnected;
 
 class WebinterFace{
     public:
         void setupWebConfig();
+        void SocketLoop();
+        void SendMessageToClient(const String& message);
 };
 
 

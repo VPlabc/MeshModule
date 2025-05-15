@@ -458,7 +458,7 @@ void connectToWifi() {
             mqttPass = doc["mqttPass"] | "password";
             wifiMode = doc["wifiMode"] | "AP";
             ssid = doc["ssid"] | "I-Soft";
-            pass = doc["pass"] | "i-soft@2023";
+            pass = doc["password"] | "i-soft@2023";
             conId = doc["conId"] | "b8e54d33-b34a-45ab-b76f-62c8a9abc6c4";
             mqttTopic = doc["mqttTopic"] | "test/topic";
             mqttTopicSub = doc["mqttTopicSub"] | "test/topic/sub";
@@ -484,7 +484,7 @@ void connectToWifi() {
         doc["mqttPass"] = "password";
         doc["wifiMode"] = "STA";
         doc["ssid"] = "I-Soft";
-        doc["pass"] = "i-soft@2023";
+        doc["password"] = "i-soft@2023";
         doc["conId"] = "b8e54d33-b34a-45ab-b76f-62c8a9abc6c4";
         doc["mqttTopic"] = "test/topic";
         doc["mqttTopicSub"] = "test/topic/sub";
@@ -591,7 +591,7 @@ bool once2 = true;
         doc["mqttPass"] = mqttPass;
         doc["wifiMode"] = wifiMode; // Lưu chế độ WiFi (STA hoặc AP)
         doc["ssid"] = ssid;
-        doc["pass"] = pass;
+        doc["password"] = pass;
         doc["conId"] = conId;
         doc["mqttTopic"] = mqttTopic;
         doc["mqttTopicSub"] = mqttTopicSub;

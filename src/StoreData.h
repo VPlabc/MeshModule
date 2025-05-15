@@ -55,6 +55,19 @@ void calculateSuccessRates() {
     }
 }
 
+String LoadDataMapping() {
+    // Load data mapping from JSON file
+    String jsonString;
+    File file = LittleFS.open(DATA_MAPPING_FILE, "r");
+    if (file) {
+        jsonString = file.readString();
+        file.close();
+    } else {
+        Serial.println("Failed to open DataMapping.json");
+    }
+    return jsonString;
+}
+
 String createJsonForWebSocket() {
     DynamicJsonDocument doc(4096); // Adjust size as needed
     JsonArray nodesArray = doc.to<JsonArray>();
@@ -76,20 +89,92 @@ String createJsonForWebSocket() {
         for (uint8_t byte : node.data) {
             dataArray.add(byte);
         }
+        // Parse the JSON string from LoadDataMapping
+        String jsonMapping = LoadDataMapping();
+        // Serial.println(jsonMapping);
+        // Parse the JSON string from LoadDataMapping
+        DynamicJsonDocument mappingDoc(4096); // Adjust size as needed
+        DeserializationError error = deserializeJson(mappingDoc, jsonMapping);
 
-        JsonArray typeArray = nodeObject.createNestedArray("type");
-        JsonArray keysArray = nodeObject.createNestedArray("keys");
+        JsonArray mappingArray = mappingDoc.as<JsonArray>();
+        if (!error) {
+            for (JsonObject mappingObject : mappingArray) {
+                if (mappingObject["ID"] == node.ID) {
 
-        // Example types and keys, adjust as needed
-        for (size_t i = 0; i < node.data.size(); ++i) {
-            typeArray.add("DWORD"); // Replace with actual type logic
-            keysArray.add("Key" + String(i + 1));
+                    JsonArray keysArray = mappingObject["keys"].as<JsonArray>();
+                    JsonArray keysNestedArray = nodeObject.createNestedArray("keys");
+                    for (JsonVariant key : keysArray) {
+                    keysNestedArray.add(key);
+                    }
+                    
+                    JsonArray typesArray = mappingObject["types"].as<JsonArray>();
+                    JsonArray typesNestedArray = nodeObject.createNestedArray("type");
+                    for (JsonVariant type : typesArray) {
+                    typesNestedArray.add(type);
+                    }
+                    break;
+                }
+            }
+        } else {
+            Serial.println("Failed to parse JSON mapping");
+            nodeObject.createNestedArray("types"); // Empty keys array
+            nodeObject.createNestedArray("keys"); // Empty keys array
         }
     }
 
     String jsonString;
     serializeJson(nodesArray, jsonString);
     return jsonString;
+    // Clear the document to free memory
+    doc.clear();
+}
+String createJsonForMqttt() {
+    DynamicJsonDocument doc(4096); // Adjust size as needed
+    JsonArray nodesArray = doc.to<JsonArray>();
+    // Parse the JSON string from LoadDataMapping
+    String jsonMapping = LoadDataMapping();
+    // Parse the JSON string from LoadDataMapping
+    DynamicJsonDocument mappingDoc(4096); // Adjust size as needed
+    DeserializationError error = deserializeJson(mappingDoc, jsonMapping);
+    JsonArray mappingArray = mappingDoc.as<JsonArray>();
+    
+    if (!error) {
+        for (const auto &entry : nodeDataMaps) {
+            const NodeDatas &node = entry.second;
+            JsonObject nodeObject = nodesArray.createNestedObject();
+            nodeObject["nodeId"] = node.ID;
+
+            JsonArray dataArray = nodeObject.createNestedArray("data");
+            for (uint8_t byte : node.data) {
+
+                dataArray.add(byte);
+            }
+            for (JsonObject mappingObject : mappingArray) {
+                if (mappingObject["ID"] == node.ID) {
+
+                    JsonArray keysArray = mappingObject["keys"].as<JsonArray>();
+                    JsonArray keysNestedArray = nodeObject.createNestedArray("keys");
+                    JsonArray typesArray = mappingObject["types"].as<JsonArray>();
+                    JsonArray typesNestedArray = nodeObject.createNestedArray("type");
+                    for (JsonVariant key : keysArray) {
+                    keysNestedArray.add(key);
+                    }
+                    for (JsonVariant type : typesArray) {
+                    typesNestedArray.add(type);
+                    }
+                    break;
+                }
+            }
+        }
+    } else {
+        Serial.println("Failed to parse JSON mapping");
+    }
+
+    String jsonString;
+    serializeJson(nodesArray, jsonString);
+    return jsonString;
+    // Clear the document to free memory
+    doc.clear();
 }
 // Function to print data for all nodes
 void printNodeData() {
@@ -103,7 +188,7 @@ void printNodeData() {
         Serial.print(static_cast<int>(node.dataSize));
         Serial.print(" | Data: ");
         for (uint8_t byte : node.data) {
-            Serial.print(byte, HEX);
+            Serial.print(byte);
             Serial.print(" ");
         }
         Serial.println();
@@ -130,6 +215,10 @@ void printNodeData() {
         Serial.print(" | Time Ago: ");
         Serial.print(std::difftime(std::time(nullptr), node.timestamp));
         Serial.println(" seconds ago");
+        // Print free heap memory in KB
+        Serial.print("Free Heap: ");
+        Serial.print(ESP.getFreeHeap() / 1024);
+        Serial.println(" KB");
         Serial.println("--------------------------");
     }
 }
