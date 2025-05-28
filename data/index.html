@@ -865,6 +865,7 @@
 
 </CENTER>
     <script>
+            var updateOnce = true;
             var gateway = `ws://192.168.0.251/ws`;
             // var gateway = `ws://${window.location.hostname}/ws`;
             var websocket;
@@ -1029,13 +1030,16 @@
                 }
 
 
-                // Call updateEditAddressOptions when nodeDataTables changes
+                // Initial call
+                if (updateOnce) {
+                    
                 const nodeDataTables = document.getElementById('nodeDataTables');
                 const observer = new MutationObserver(updateEditAddressOptions);
                 observer.observe(nodeDataTables, { childList: true, subtree: true });
 
-                // Initial call
-                updateEditAddressOptions();
+                    updateEditAddressOptions();
+                    updateOnce = false;
+                }
                 return;
             }
             const dashboard = document.getElementById('nodeDashboard');
@@ -1124,7 +1128,7 @@
             if (window.websocket && window.websocket.readyState === WebSocket.OPEN) {
                 window.websocket.send(JSON.stringify(cmd));
                 // alert("Sent: " + JSON.stringify(cmd));
-                console.log("Sent: " + JSON.stringify(cmd));
+                console.log("Sent: " + JSON.stringify(cmd)); 
             } else {
                 alert("WebSocket not connected.");
             }

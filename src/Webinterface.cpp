@@ -711,6 +711,18 @@ server.on("/save-wifi-mqtt-config", HTTP_POST, [](AsyncWebServerRequest *request
             }
         }
         json += "]";
+        // Add file size for each file
+        if (permissionLevel == 3) {
+            file = root.openNextFile();
+            while (file) {
+            if (!first) json += ",";
+            json += "{\"name\":\"" + String(file.name()) + "\",\"size\":" + String(file.size()) + "}";
+            first = false;
+            file = root.openNextFile();
+            }
+        }
+        json += ",{\"used_kb\":" + String(LittleFS.usedBytes() / 1024) +
+            ",\"free_kb\":" + String((LittleFS.totalBytes() - LittleFS.usedBytes()) / 1024) + "}";
         request->send(200, "application/json", json);
     });
 
