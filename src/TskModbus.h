@@ -92,11 +92,52 @@ String ModbusConfig::loadModbusConfig(bool debug, fs::FS &FileSystem) {
                 file.close();
 
                 if (debug) {
-                    Serial.println("Loaded JSON from modbus.json:");
-                    Serial.println(jsonString);
+                    // Serial.println("Loaded JSON from modbus.json:");
+                    // Serial.println(jsonString);
                 }
 
         }
+    }
+    return jsonString;
+}
+
+String loadModbusDataBlockConfig(bool debug, fs::FS &FileSystem) {
+    const char* DATABLOCK_FILE = "/ModbusDataBlock.json";
+    String jsonString;
+    if (!FileSystem.exists(DATABLOCK_FILE)) {
+        if (debug) Serial.println("ModbusDataBlock.json not found.");
+
+        // Tạo cấu hình mặc định
+        DynamicJsonDocument doc(512);
+        JsonArray blocks = doc.to<JsonArray>();
+        JsonObject block = blocks.createNestedObject();
+        block["offset"] = 0;
+        block["tagFrom"] = 1000;
+        block["valueFrom"] = 200;
+        block["typeFrom"] = 1;
+        block["amount"] = 10;
+
+        // Lưu file cấu hình mặc định
+        File configFile = FileSystem.open(DATABLOCK_FILE, "w");
+        if (configFile) {
+            serializeJson(doc, configFile);
+            configFile.close();
+            if (debug) Serial.println("Default ModbusDataBlock configuration created.");
+        } else {
+            return "Failed to create default ModbusDataBlock config";
+        }
+        serializeJson(doc, jsonString);
+        return jsonString;
+    } else {
+        File file = FileSystem.open(DATABLOCK_FILE, "r");
+        if (!file) {
+            if (debug) Serial.println("Failed to open ModbusDataBlock.json for reading.");
+            return "Failed to open ModbusDataBlock.json for reading.";
+        }
+        while (file.available()) {
+            jsonString += char(file.read());
+        }
+        file.close();
     }
     return jsonString;
 }

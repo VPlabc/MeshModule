@@ -23,7 +23,6 @@ DataMapping dataMapping;
 
 
 // String DATA_MAPPING_FILE = "/DataMapping.json";
-
 void updateDataMappingFromPacket(const dataPacket &packet) {
     if (dataMapping.regAddresses.empty() && dataMapping.coilAddresses.empty()) {
         if (MeshConfig.debug) Serial.println("DataMapping is empty. Skipping update.");
@@ -121,6 +120,8 @@ void saveDataMapping() {
     }
     file.close();
 }
+bool bien_dong_mot_hai_ba;
+bool bienDongMotHaiBa;
 
 void loadDataMapping() {
     if (!FileSystem.exists(DATA_MAPPING_FILE)) {

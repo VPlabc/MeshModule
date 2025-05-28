@@ -41,32 +41,41 @@ MeshModule/
 - Cài đặt [PlatformIO](https://platformio.org/) trên Visual Studio Code.
 - Clone dự án:
   ```bash
-  git clone https://github.com/your-repo/MeshModule.git
+  git clone https://github.com/vplabc/MeshModule.git
   cd MeshModule
   ```
 
 Các hàm chính
 1. WiFi
-setupWiFiAP(): Khởi động chế độ Access Point.
-checkConfigButton(): Kiểm tra nút nhấn để vào chế độ cấu hình.
+  setupWiFiAP(): Khởi động chế độ Access Point.
+  checkConfigButton(): Kiểm tra nút nhấn để vào chế độ cấu hình.
+
 2. ESP-NOW
-receiveCallback(): Callback khi nhận dữ liệu qua ESP-NOW.
-sentCallback(): Callback khi gửi dữ liệu qua ESP-NOW.
+  receiveCallback(): Callback khi nhận dữ liệu qua ESP-NOW.
+  sentCallback(): Callback khi gửi dữ liệu qua ESP-NOW.
+
 3. LoRa
-mainLoRa.LoRaSetup(): Cấu hình LoRa.
-mainLoRa.LoRaLoop(): Vòng lặp xử lý LoRa.
+  mainLoRa.LoRaSetup(): Cấu hình LoRa.
+  mainLoRa.LoRaLoop(): Vòng lặp xử lý LoRa.
+
 4. Modbus
-ModbusInit(): Khởi tạo Modbus RTU.
-ModbusLoop(): Vòng lặp xử lý Modbus.
+  ModbusInit(): Khởi tạo Modbus RTU.
+  ModbusLoop(): Vòng lặp xử lý Modbus.
+
+Value: địa chỉ thanh ghi chip
+value + addressOffset: địa chỉ thanh ghi thiế bị
+
+
 5. MQTT
-MQTTwifiConfig.setup(): Cấu hình MQTT.
-MQTTwifiConfig.loop(): Vòng lặp xử lý MQTT.
+  MQTTwifiConfig.setup(): Cấu hình MQTT.
+  MQTTwifiConfig.loop(): Vòng lặp xử lý MQTT.
+  
 Debug
-Bật/tắt debug bằng cách thay đổi giá trị:
-```cpp
-MeshConfig.debug = true; // Bật debug
-MeshConfig.debug = false; // Tắt debug
-```
+  Bật/tắt debug bằng cách thay đổi giá trị:
+  ```cpp
+  MeshConfig.debug = true; // Bật debug
+  MeshConfig.debug = false; // Tắt debug
+  ```
 ### **2. Cấu hình dự án**
 - Mở tệp `platformio.ini` và cấu hình các thông số như WiFi, MQTT, LoRa, và Modbus.
 - Tải mã nguồn lên ESP32 bằng cách nhấn nút "Upload" trong PlatformIO.

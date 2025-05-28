@@ -1,6 +1,8 @@
 #ifndef Main_H
 #define Main_H
 
+#define TCP_ETH
+#define USE_SD
 #define USE_LITTLEFS // Ensure LittleFS is used
 // #define ESP32_RISCV
 
@@ -10,6 +12,11 @@
 #define USE_Modbus
 #define USE_MQTT
 #endif// USE_SERIAL1
+
+#ifdef TCP_ETH
+// #define USE_LAN8720
+#define USE_W5500
+#endif// TCP_ETH
 
 #ifdef USE_SERIAL2
 #define USE_Modbus
@@ -60,8 +67,8 @@
 #define CONFIG_FILE "/config.json"
 #define MACLIST_FILE "/maclist.json"
 
-#include <ETH.h>
-
+#include <Wire.h>
+#include <SPI.h>
 extern int8_t BUZZ;
 extern int8_t SETUP_BUTTON;
 extern int8_t LED_STT;
@@ -80,21 +87,28 @@ extern int8_t Ser_1RX;
 extern int8_t Ser_1TX;
 extern int8_t M0_PIN;
 extern int8_t M1_PIN;
-extern int8_t ETH_POWER_PIN_ALTERNATIVE;
-extern int8_t ETH_MDC_PIN;
-extern int8_t ETH_MDIO_PIN;
+extern int8_t CS_PIN;
+extern int8_t RST_PIN;
+extern int8_t INIT_PIN;
 extern int8_t Ser_2RX;
 extern int8_t Ser_2TX;
 
 
 // #ifdef Module_10O4I
 // #include "Adafruit_MCP23008.h"
+#ifdef USE_LAN8720
+#include <ETH.h>
 #define ETH_ADDR 1
 #define ETH_POWER_PIN -1 // Do not use it, it can cause conflict during the software reset.
 #define ETH_TYPE ETH_PHY_LAN8720
 #define ETH_CLK_MODE ETH_CLOCK_GPIO0_IN
-
-
+#endif//USE_LAN8720
+#ifdef USE_W5500
+#include <Ethernet.h>
+#endif//USE_W5500
+#ifdef USE_SD
+#include <SD.h>
+#endif//USE_SD
 
 // #endif// Module 10O4I
 #define Se_BAUD_RATE 115200

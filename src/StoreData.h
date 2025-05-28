@@ -58,6 +58,17 @@ void calculateSuccessRates() {
 String LoadDataMapping() {
     // Load data mapping from JSON file
     String jsonString;
+    if (!LittleFS.exists(DATA_MAPPING_FILE)) {
+        // Tạo file mặc định nếu chưa tồn tại
+        File defaultFile = LittleFS.open(DATA_MAPPING_FILE, "w");
+        if (defaultFile) {
+            defaultFile.print("[{\"ID\":1,\"types\":[\"COILS\",\"BYTE\",\"WORD\",\"DWORD\",\"FLOAT\"],\"keys\":[\"key1\",\"key2\",\"key3\",\"key4\",\"key5\"]}]");
+            defaultFile.close();
+            Serial.println("Created default DataMapping.json");
+        } else {
+            Serial.println("Failed to create default DataMapping.json");
+        }
+    }
     File file = LittleFS.open(DATA_MAPPING_FILE, "r");
     if (file) {
         jsonString = file.readString();

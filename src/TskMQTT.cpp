@@ -278,7 +278,7 @@ void connectToWifi() {
       switch(event) {
       case SYSTEM_EVENT_STA_GOT_IP:
         reconnectAttempts = 0;
-          Serial.println("WiFi connected");
+          Serial.println("✅ WiFi connected");
           Serial.println("IP address: ");
           Serial.println(WiFi.localIP());
           connectToMqtt();
@@ -289,7 +289,7 @@ void connectToWifi() {
           xTimerStart(mqttReconnectTimer, 0);
           break;
       case SYSTEM_EVENT_STA_DISCONNECTED:
-          Serial.println("WiFi lost connection");
+          Serial.println("❌ WiFi lost connection");
           
           xTimerStop(mqttReconnectTimer, 0); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
           xTimerStart(wifiReconnectTimer, 0);
@@ -297,25 +297,28 @@ void connectToWifi() {
       case SYSTEM_EVENT_ETH_START:
         LOGLN("ETH Started");
         // set eth hostname here
-        //ETH.setHostname("iotdevice");
+        #ifdef USE_LAN8720
+        ETH.setHostname("iotdevice");
+        #endif//USE_LAN8720
         break;
     case SYSTEM_EVENT_ETH_CONNECTED:
         LOGLN("ETH Connected");
         break;
     case SYSTEM_EVENT_ETH_GOT_IP:
+    #ifdef USE_LAN8720
         Serial.print("ETH MAC: ");
-        //Serial.print(ETH.macAddress());
+        Serial.print(ETH.macAddress());
         Serial.print(", IPv4: ");
-        //Serial.print(ETH.localIP());
-        // if (ETH.fullDuplex())
-        // {
-        //     Serial.print(", FULL_DUPLEX");
-        // }
+        Serial.print(ETH.localIP());
+        if (ETH.fullDuplex())
+        {
+            Serial.print(", FULL_DUPLEX");
+        }
         Serial.print(", ");
-        // Serial.print(ETH.linkSpeed());
+        Serial.print(ETH.linkSpeed());
         LOGLN("Mbps");
-        //eth_connected = true;
-
+        // eth_connected = true;
+    #endif//USE_LAN8720
         break;
         case SYSTEM_EVENT_ETH_DISCONNECTED:
             LOGLN("ETH Disconnected");
@@ -334,8 +337,9 @@ void connectToWifi() {
             // ap_connected = false;SocketConnect = false;
             break;
 
-        case SYSTEM_EVENT_AP_STADISCONNECTED:
+        case 13:
             LOGLN("AP Disconnected");
+            WebConnected = false;
             //ap_connected = false;
             //SocketConnect = false;
             break;
@@ -365,9 +369,10 @@ void connectToWifi() {
     Serial.println(packetIdSub);
     // mqttClient.publish("test/lol", 0, true, "test 1");
     // Serial.println("Publishing at QoS 0");
-        String TimeAt = String(Getyear) + "-" + String(Getmonth) + "-" + String(Getday) + " " + String(Gethour) + ":" + String(Getmin) + ":" + String(Getsec);
-        String payload = "Node Start at: " + TimeAt + " with IP: " + String(WiFi.localIP().toString());
-    uint16_t packetIdPub1 = mqttClient.publish(mqttTopicStat.c_str(), 1, true, payload.c_str());payload.clear();TimeAt.clear();
+    String TimeAt = String(Getyear) + "-" + String(Getmonth) + "-" + String(Getday) + " " + String(Gethour) + ":" + String(Getmin) + ":" + String(Getsec);
+    String payload = "Node Start at: " + TimeAt + " with IP: " + String(WiFi.localIP().toString());
+    String TopicStart = mqttTopicStat + "/Node19";
+    uint16_t packetIdPub1 = mqttClient.publish(TopicStart.c_str(), 1, true, payload.c_str());payload.clear();TimeAt.clear();
     Serial.print("Publishing at QoS " + String(mqttQos) + ", packetId: ");
     Serial.println(packetIdPub1);
     // Set Last Will and Testament (LWT) if enabled

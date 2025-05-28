@@ -61,7 +61,7 @@ enum {MBmaster, MBslave};
 // Khai báo extern để sử dụng các biến toàn cục
 extern boolean coils[50];
 extern uint16_t holdingRegisters[200];
-extern uint16_t inputRegisters[200];
+extern uint16_t inputRegisters[2000];
 class Modbus_Prog
 {
 public:
@@ -107,13 +107,16 @@ void connectModbus(bool update);
 bool getStart();
 //////////////////////////////
 void MonitorData();
+JSONVar getDataBlocks();
+String GetJson();
 uint32_t DWORD(uint16_t u1, uint16_t u2);
 uint16_t GetHoldingReg(uint16_t addr);
-void SetCoilReg(uint16_t addr,boolean value);
-void SetHoldingReg(uint16_t addr,uint16_t value);
+uint16_t GetInputHoldingReg(uint16_t addr);
+void SetCoilReg(int ID, uint16_t addr,boolean value);
+void SetHoldingReg(int ID, uint16_t addr,uint16_t value);
 
 bool GetCoilReg(uint16_t addr);
-void modbus_setup(String ModbusParameter, int8_t RXpin, int8_t TXpin) ;
+void modbus_setup(String ModbusParameter, String DataBckParam, int8_t RXpin, int8_t TXpin) ;
 void modbus_loop(int Timeout);
 //////////////////////////////
 void debugs();

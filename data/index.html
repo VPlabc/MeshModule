@@ -16,6 +16,7 @@
             background-color: #00101c;
             color: white;
             padding: 10px 20px;
+            width: 100%;
         }
         .header h1 {
             margin: 0;
@@ -132,35 +133,81 @@
             </g>
            </svg>
         <h1>Wireless IoT Configuration</h1>
+        
+        <div style="position: relative;display:flex">
+            <!-- Socket Status Icon -->
+            <span id="socketStatusIcon" style="margin-left:8px; display:inline-flex; align-items:center;">
+                <svg id="socketStatusSvg" width="16" height="16" viewBox="0 0 16 16" style="vertical-align:middle;">
+                    <circle cx="8" cy="8" r="7" fill="red" stroke="#888" stroke-width="1"/>
+                </svg>
+            </span>
+        </div>  
+        <div style="position: relative;display:flex">
+
+                <!-- Reset ESP Button -->
+                <button id="resetEspBtn" style="background-color:#ff9800;color:white;padding:6px 14px;border:none;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:6px;margin-bottom:10px;" onclick="resetEsp()">
+                    <svg xmlns="http://www.w3.org/2000/svg" height="18" width="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+                </button>
+        </div>
+        <!-- User Icon Dropdown -->
+        <div style="position: relative;">
+            <button id="userDropdownBtn" style="background: none; border: none; cursor: pointer; color: white; font-size: 22px; display: flex; align-items: center;">
+                <svg xmlns="http://www.w3.org/2000/svg" height="28" width="28" viewBox="0 0 24 24" fill="white"><circle cx="12" cy="8" r="4"/><path d="M12 14c-4.418 0-8 1.79-8 4v2h16v-2c0-2.21-3.582-4-8-4z"/></svg>
+                <span style="margin-left: 8px; font-size: 16px;">Admin</span>
+                <svg style="margin-left: 4px;" width="16" height="16" fill="white" viewBox="0 0 16 16"><path d="M4.646 6.646a.5.5 0 0 1 .708 0L8 9.293l2.646-2.647a.5.5 0 0 1 .708.708l-3 3a.5.5 0 0 1-.708 0l-3-3a.5.5 0 0 1 0-.708z"/></svg>
+            </button>
+            <div id="userDropdownMenu" style="display:none; position:absolute; right:0; top:40px; background:#646464; color:#222; min-width:160px; box-shadow:0 2px 8px rgba(0,0,0,0.15); border-radius:6px; z-index:1000;">
+                <button onclick="showChangePasswordModal()" style="width:100%;padding:10px 16px;background:none;border:none;text-align:left;cursor:pointer;font-size:15px;">Change Password</button>
+                <button onclick="logoutUser()" style="width:100%;padding:10px 16px;background:none;border:none;text-align:left;cursor:pointer;font-size:15px;">Logout</button>
+            </div>
+        </div>
+        <!-- Change Password Modal -->
+        <div id="changePasswordModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.3); z-index:2000; align-items:center; justify-content:center;">
+            <div style="background:#cdcdcd; padding:28px 24px 18px 24px; border-radius:8px; min-width:320px; max-width:90vw; box-shadow:0 4px 16px rgba(0,0,0,0.18); position:relative;">
+                <h3 style="margin-top:0;">Change Password</h3>
+                <div style="margin-bottom:12px;">
+                    <input id="newPassword" type="password" placeholder="New Password" style="width:100%;padding:8px;margin-bottom:8px;border:1px solid #ccc;border-radius:4px;">
+                    <input id="confirmPassword" type="password" placeholder="Confirm New Password" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;">
+                </div>
+                <div id="changePasswordError" style="color:red; font-size:13px; min-height:18px;"></div>
+                <div style="margin-top:10px; display:flex; justify-content:flex-end; gap:8px;">
+                    <button onclick="closeChangePasswordModal()" style="padding:6px 14px; background:#ff9f29; border:none; border-radius:4px; cursor:pointer;">Cancel</button>
+                    <button onclick="submitChangePassword()" style="padding:6px 14px; background:#2196F3; color:white; border:none; border-radius:4px; cursor:pointer;">Change</button>
+                </div>
+            </div>
+        </div>    
     </div>
     <div class="tabs">
-        <div class="tab active" onclick="showTab('meshConfig')">Mesh Network</div> 
+        <div class="tab active" onclick="showTab('dashboard')">Dashboard</div> 
+        <div class="tab" onclick="showTab('meshConfig')">Mesh Network</div> 
         <div class="tab" onclick="showTab('modbusConfig')">Modbus Configuration</div>
         <div class="tab" onclick="showTab('wifiConfig')">WiFi Configuration</div>
         <div class="tab" onclick="showTab('mappingData')">Mapping Data</div>
         <!-- <div class="tab" onclick="showTab('loraConfig')">LoRa E32 Configuration</div>
         <div class="tab" onclick="showTab('loraRYConfig')">LoRa RY Configuration</div> -->
         <div class="tab" onclick="showTab('fileManager')">File Manager</div>
+        <div class="tab" onclick="showTab('dataViewer')">Data Viewer</div>
     </div>
 <CENTER>
     
     <div id="mappingData" class="tab-content">
         <h2>Mapping Data</h2>
+
         <div style="margin-bottom: 20px;">
-            <div style="display:none">
-                <label for="jsonMappingData" style="display: block; margin-bottom: 10px;">JSON Mapping Data:</label>
-                <textarea id="jsonMappingData" name="jsonMappingData" placeholder="Enter JSON data here" style="width: 100%; height: 150px; resize: vertical;"></textarea>
-                <textarea id="jsonMappingDatas" name="jsonMappingDatas" placeholder="Enter JSON data here" style=" width: 100%; height: 150px; resize: vertical;"></textarea>
-                <button type="button" onclick="saveDataMapping()" >Save Mapping Data</button>
-                <button type="button" onclick="loadDataMapping()" >load Mapping Data</button>
-                <button type="button" onclick="submitMappingData()">Submit Mapping Data</button>
-            </div>
-            
-            </div>
+            <select id="edit_type" style="width:80px;" title="Select type">
+                <option value="coil">Coil</option>
+                <option value="word">Word</option>
+                <option value="dword">DWord</option>
+            </select>
+            <input type="number" id="edit_value" placeholder="value" style="width:100px;" min="0" max="1">
+            <select id="edit_address" style="width:90px;"></select>
+            <button type="button" onclick="sendEditCommand()">Send</button>
+        </div>
+        <div style="margin-bottom: 20px;">
             <div id="nodeDataTables"></div>
             <!-- Data tables for nodes will be dynamically generated here -->
         </div>
-    
+    </div>
         <script>
 
             function submitMappingData() {
@@ -188,7 +235,49 @@
                     console.error('JSON Parsing Error:', error);
                 }
             }
+
+            function saveDataViewer() {
+                const data = document.getElementById('dataViewerTextarea').value;
+                fetch('/save-data-viewer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ data })
+                })
+                .then(response => response.json())
+                .then(res => alert(res.status || 'Data saved!'))
+                .catch(err => alert('Save failed: ' + err));
+            }
+
+            function loadDataViewer() {
+                fetch('/load-data-viewer')
+                .then(response => response.json())
+                .then(res => {
+                    document.getElementById('dataViewerTextarea').value = res.data || '';
+                })
+                .catch(err => alert('Load failed: ' + err));
+            }
         </script>
+    <div id="dataViewer" class="tab-content">
+        <h2>Data Viewer</h2>
+        <textarea id="dataViewerTextarea" style="width:100%;height:200px;resize:vertical;" placeholder="Enter your data here..."></textarea>
+        <div style="margin-top:10px;">
+            <button type="button" onclick="saveDataViewer()">Save</button>
+            <button type="button" onclick="loadDataViewer()">Load</button>
+            <p id="responseMessageViewer" style="margin-top: 20px; color: green;"></p>
+        </div>
+        
+        <div>
+            <label for="jsonMappingData" style="display: block; margin-bottom: 10px;">JSON Mapping Data:</label>
+            <textarea id="jsonMappingData" name="jsonMappingData" placeholder="Enter JSON data here" style="width: 100%; height: 150px; resize: vertical;"></textarea>
+            <textarea id="jsonMappingDatas" name="jsonMappingDatas" placeholder="Enter JSON data here" style=" width: 100%; height: 150px; resize: vertical;"></textarea>
+            <button type="button" onclick="saveDataMapping()" >Save Mapping Data</button>
+            <button type="button" onclick="loadDataMapping()" >load Mapping Data</button>
+            <p id="responseMessageMapping" style="margin-top: 20px; color: green;"></p>
+
+            <button type="button" onclick="submitMappingData()">Submit Mapping Data</button>
+            <p id="responseMessageMappings" style="margin-top: 20px; color: green;"></p>
+        </div>
+    </div>
 
     <div id="loraRYConfig" class="tab-content">
         <h2>LoRa RY Module Configuration</h2>
@@ -231,6 +320,7 @@
             </div>
             <button type="button" onclick="submitLoRaRYConfig()">Submit</button>
         </form>
+            <p id="responseMessageRyConfig" style="margin-top: 20px; color: green;"></p>
     </div>
     <div id="loraConfig" class="tab-content">
         <h2>LoRa E32 Configuration</h2>
@@ -292,6 +382,7 @@
 
             <button type="button" onclick="submitLoRaConfig()">Submit</button>
         </form>
+            <p id="responseMessageLora" style="margin-top: 20px; color: green;"></p>
     </div>
 
     <div id="modbusConfig" class="tab-content">
@@ -312,52 +403,7 @@
                 <option value="RS485">RS485</option>
             </select>
             </div>
-            <div style="margin-bottom: 10px;">
-                <table id="tagsTable">
-                    <thead>
-                        <tr>
-                            <th>Tag</th>
-                            <th>Value</th>
-                            <th>Type</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td><input type="text" name="tags[]" placeholder="1101" required></td>
-                            <td><input type="text" name="values[]" placeholder="164" required></td>
-                            <td><input type="text" name="types[]" placeholder="2" required></td>
-                            <td><button type="button" onclick="deleteRow(this)">Delete</button></td>
-                        </tr>
-                    </tbody>
-                </table>
-                <button type="button" onclick="addRow()">Add Row</button>
-            </div>
-
-            <script>
-                function addRow() {
-                    const table = document.getElementById('tagsTable').getElementsByTagName('tbody')[0];
-                    const rowCount = table.rows.length;
-
-                    if (rowCount >= 120) {
-                        alert('Maximum of 120 rows allowed.');
-                        return;
-                    }
-
-                    const newRow = table.insertRow();
-                    newRow.innerHTML = `
-                        <td><input type="number" name="tags[]" placeholder="1101" required></td>
-                        <td><input type="number" name="values[]" placeholder="164" required></td>
-                        <td><input type="number" name="types[]" placeholder="2" required></td>
-                        <td><button type="button" onclick="deleteRow(this)">Delete</button></td>
-                    `;
-                }
-
-                function deleteRow(button) {
-                    const row = button.parentElement.parentElement;
-                    row.parentElement.removeChild(row);
-                }
-            </script>
+            
             <div style="margin-bottom: 10px;">
             <label for="id" style="display: inline-block; width: 150px;">Modbus Slave ID:</label>
             <input type="number" id="id" name="id" min="1" max="255" required style="width: 200px;">
@@ -371,6 +417,155 @@
         </form>
 
         <p id="responseMessage" style="margin-top: 20px; color: green;"></p>
+
+        <div style="margin-top: 10px; display: flex; gap: 10px; align-items: flex-end;">
+            <div>
+                <label>Create Data Block</label><br>
+                <input type="number" id="offset" placeholder="Address offset" style="width: 70px;">
+                <input type="number" id="tagFrom2" placeholder="Tag From" style="width: 70px;">
+                <input type="number" id="valueFrom2" placeholder="Value From" style="width: 70px;">
+                <input type="number" id="typeFrom2" placeholder="Type From" style="width: 70px;">
+                <input type="number" id="amount" placeholder="Amount" style="width: 70px;">
+            </div>
+            <!-- <button type="button" onclick="addRangeAmount()">Add Row (Amount)</button> -->
+            <button type="button" onclick="addDataBlock()">Add Data Block</button>
+            <button type="button" onclick="sendDataBlocks()">Send Data Blocks</button>
+        </div>
+        <div id="dataBlockCards" style="margin-top: 15px; display: flex; flex-wrap: wrap; gap: 10px;"></div>
+
+        <button type="button" onclick="addRow()">Add Row</button>
+
+        <div style="margin-bottom: 10px;">
+            <table id="tagsTable">
+                <thead>
+                    <tr>
+                        <th>Tag</th>
+                        <th>Offset</th>
+                        <th>Value</th>
+                        <th>Type</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><input type="text" name="tags[]" placeholder="1101" required></td>
+                        <td><input type="text" name="Offset[]" placeholder="0" required></td>
+                        <td><input type="text" name="values[]" placeholder="164" required></td>
+                        <td><input type="text" name="types[]" placeholder="2" required></td>
+                        <td><button type="button" onclick="deleteRow(this)">Delete</button></td>
+                    </tr>
+                </tbody>
+            </table>
+
+        </div>
+        <script>
+                function addRow() {
+                    const table = document.getElementById('tagsTable').getElementsByTagName('tbody')[0];
+                    const rowCount = table.rows.length;
+
+                    if (rowCount >= 120) {
+                        alert('Maximum of 120 rows allowed.');
+                        return;
+                    }
+
+                    const newRow = table.insertRow();
+                    newRow.innerHTML = `
+                        <td><input type="number" name="tags[]" placeholder="1101" required></td>
+                        <td><input type="number" name="Offset[]" placeholder="164" required></td>
+                        <td><input type="number" name="values[]" placeholder="164" required></td>
+                        <td><input type="number" name="types[]" placeholder="2" required></td>
+                        <td><button type="button" onclick="deleteRow(this)">Delete</button></td>
+                    `;
+                }
+                
+                function deleteRow(button) {
+                    const row = button.parentElement.parentElement;
+                    row.parentElement.removeChild(row);
+                }
+                // Store blocks in memory
+                let dataBlocks = [];
+
+                function addDataBlock() {
+                    const offset = parseInt(document.getElementById('offset').value);
+                    const tagFrom = parseInt(document.getElementById('tagFrom2').value);
+                    const valueFrom = parseInt(document.getElementById('valueFrom2').value);
+                    const typeFrom = parseInt(document.getElementById('typeFrom2').value);
+                    const amount = parseInt(document.getElementById('amount').value);
+
+                    if (
+                        isNaN(tagFrom) || isNaN(valueFrom) || isNaN(typeFrom) ||
+                        isNaN(amount) || amount <= 0
+                    ) {
+                        alert('Please enter all From values and a valid amount.');
+                        return;
+                    }
+
+                    // Create block object
+                    const block = {
+                        offset,
+                        tagFrom,
+                        valueFrom,
+                        typeFrom,
+                        amount
+                    };
+                    dataBlocks.push(block);
+                    renderDataBlockCards();
+                }
+
+                function renderDataBlockCards() {
+                    const container = document.getElementById('dataBlockCards');
+                    container.innerHTML = '';
+                    dataBlocks.forEach((block, idx) => {
+                        const card = document.createElement('div');
+                        card.style.border = '1px solid #aaa';
+                        card.style.borderRadius = '6px';
+                        card.style.padding = '10px';
+                        card.style.background = '#f9f9f9';
+                        card.style.minWidth = '180px';
+                        card.innerHTML = `
+                            <strong>Block ${idx + 1}</strong><br>
+                            Address offset: ${block.offset}<br>
+                            Tag From: ${block.tagFrom}<br>
+                            Value From: ${block.valueFrom}<br>
+                            Type From: ${block.typeFrom}<br>
+                            Amount: ${block.amount}<br>
+                            <button type="button" onclick="removeDataBlock(${idx})" style="margin-top:5px;background:#f44336;color:white;border:none;padding:2px 8px;border-radius:3px;">Delete</button>
+                        `;
+                        container.appendChild(card);
+                    });
+                }
+
+                function removeDataBlock(idx) {
+                    dataBlocks.splice(idx, 1);
+                    renderDataBlockCards();
+                }
+
+                function sendDataBlocks() {
+                    // Add blocks to a JSON object and send to API
+                    const payload = { block: dataBlocks };
+                    fetch('/save-datablocks', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    })
+                    .then(res => res.json())
+                    .then(data => alert(data.status || 'Data blocks sent!'))
+                    .catch(err => alert('Send failed: ' + err));
+                }
+
+                // Show cards when loading JSON
+                function showBlocksFromJson(json) {
+                    try {
+                        const obj = typeof json === 'string' ? JSON.parse(json) : json;
+                        if (obj.block && Array.isArray(obj.block)) {
+                            dataBlocks = obj.block;
+                            renderDataBlockCards();
+                        }
+                    } catch (e) {
+                        // ignore
+                    }
+                }
+            </script>
     </div>
 
     <div id="fileManager" class="tab-content">
@@ -393,7 +588,18 @@
             <button onclick="uploadFile()">Upload</button>
         </div>
     </div>
-    <div id="meshConfig" class="tab-content active">
+    
+    <div id="dashboard" class="tab-content active">
+        <div style="display: flex; gap: 20px;">
+            <!-- Dashboard Card -->
+            <div style="flex: 2; border: 1px solid #ddd; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);height: 750px;">
+                <div id="nodeDashboard" style="display: flex; flex-wrap: wrap; gap: 20px;">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="meshConfig" class="tab-content">
         <div style="display: flex; gap: 20px;">
             <!-- Configuration Card -->
             <div style="flex: 1; border: 1px solid #ddd; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
@@ -402,11 +608,29 @@
                     <div style="margin-bottom: 10px;">
                         <label for="boardModel" style="display: inline-block; width: 150px;">Board Model:</label>
                         <select id="boardModel" name="boardModel" style="width: 200px;">
-                            <option value="0">Board ModRTUMesh</option>
-                            <option value="1">Board 410WER</option>
-                            <option value="2">Board LklineGw</option>
-                            <option value="3">Board LklineNode</option>
+                            <option value="0">Board Custom Model</option>
+                            <option value="1">Board ModRTUMesh</option>
+                            <option value="2">Board 410WER</option>
+                            <option value="3">Board LklineGw</option>
+                            <option value="4">Board LklineNode</option>
+                            <option value="5">Board S3SDCWER</option>
                         </select>
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <label for="MeshEnable" style="display: inline-block; width: 150px;">Mesh enable:</label>
+                        <input type="checkbox" id="MeshEnable" name="MeshEnable">
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <label for="debug" style="display: inline-block; width: 150px;">Debug:</label>
+                        <input type="checkbox" id="debug" name="debug">
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <label for="loraEnb" style="display: inline-block; width: 150px;">LoRa enable:</label>
+                        <input type="checkbox" id="loraEnb" name="loraEnb">
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <label for="buzzEnb" style="display: inline-block; width: 150px;">Buzzer enable:</label>
+                        <input type="checkbox" id="buzzEnb" name="buzzEnb">
                     </div>
                     <div style="margin-bottom: 10px;">
                         <label for="brokerAddress" style="display: inline-block; width: 150px;">Broker MAC Address:</label>
@@ -446,14 +670,6 @@
                         </select>
                     </div>
                     <div style="margin-bottom: 10px;">
-                        <label for="debug" style="display: inline-block; width: 150px;">Debug:</label>
-                        <input type="checkbox" id="debug" name="debug">
-                    </div>
-                    <div style="margin-bottom: 10px;">
-                        <label for="loraEnb" style="display: inline-block; width: 150px;">LoRa enable:</label>
-                        <input type="checkbox" id="loraEnb" name="loraEnb">
-                    </div>
-                    <div style="margin-bottom: 10px;">
                         <label for="macSlaves" style="display: inline-block; width: 150px;">Slave MAC Addresses:</label>
                         <input type="text" id="macSlaves" name="macSlaves" placeholder="Comma-separated MACs" style="width: 200px;">
                     </div>
@@ -479,19 +695,10 @@
                         </select>
                     </div>
                     <button type="button" onclick="submitMeshConfig()">Submit</button>
-                </form>
-            </div>
 
-            <!-- Dashboard Card -->
-             
-            <div style="flex: 2; border: 1px solid #ddd; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
-                
-            <div id="socketStatus" style="width: 100%; display: flex; justify-content: space-between; align-items: center;font-size: 14px; margin-bottom: 10px; font-weight: bold; color: red; text-align: center;">Disconnected</div>
-                <div id="nodeDashboard" style="display: flex; flex-wrap: wrap; gap: 20px;">
-                    
-                    <!-- Example Node Card -->
-                    <!-- Node cards will be dynamically generated here -->
-                </div>
+                </form>
+                    <p id="responseMessageMesh" style="margin-top: 20px; color: green;"></p>
+                <span id="resetEspResponse" style="margin-left:10px;color:#2196F3;font-weight:bold;"></span>
             </div>
         </div>
     </div>
@@ -512,6 +719,33 @@
             <div style="margin-bottom: 10px;">
                 <label for="password" style="display: inline-block; width: 150px;">Password:</label>
                 <input type="password" id="password" name="password" placeholder="Enter Password" style="width: 200px;">
+            </div>
+            <h2>Ethernet Settings</h2>
+            <div style="margin-bottom: 10px;">
+                <label for="ethDhcp" style="display: inline-block; width: 150px;">DHCP Enable:</label>
+                <input type="checkbox" id="ethDhcp" name="ethDhcp">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="ethIp" style="display: inline-block; width: 150px;">IP Address:</label>
+                <input type="text" id="ethIp" name="ethIp" placeholder="192.168.1.100" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="ethSubnet" style="display: inline-block; width: 150px;">Subnet Mask:</label>
+                <input type="text" id="ethSubnet" name="ethSubnet" placeholder="255.255.255.0" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="ethGateway" style="display: inline-block; width: 150px;">Gateway:</label>
+                <input type="text" id="ethGateway" name="ethGateway" placeholder="192.168.1.1" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="ethDns" style="display: inline-block; width: 150px;">DNS:</label>
+                <input type="text" id="ethDns" name="ethDns" placeholder="8.8.8.8" style="width: 200px;">
+            </div>
+
+            <div style="margin-bottom: 10px;">
+                <button type="button" onclick="saveEthernetConfig()">Save Ethernet Settings</button>
+                <button type="button" onclick="loadEthernetConfig()">Reload Ethernet Settings</button>
+                    <p id="responseMessageEther" style="margin-top: 20px; color: green;"></p>
             </div>
             <hr style="margin: 20px 0; border: 1px solid #ddd;">
 
@@ -626,12 +860,13 @@
         </div>
         <button type="button" onclick="submitWiFiMQTTConfig()">Update</button>
         </form>
+        <p id="responseMessageWifi" style="margin-top: 20px; color: green;"></p>
     </div>
 
 </CENTER>
     <script>
-
-            var gateway = `ws://${window.location.hostname}/ws`;
+            var gateway = `ws://192.168.0.251/ws`;
+            // var gateway = `ws://${window.location.hostname}/ws`;
             var websocket;
             window.addEventListener('load', onLoad);
 
@@ -647,6 +882,9 @@
                 console.log('WebSocket connection established.');
                 updateSocketStatus(true);
                 websocket.send(JSON.stringify({ type: 'subscribe', topic: 'nodeDashboard' }));
+                setInterval(() => {
+                    if (websocket.readyState === WebSocket.OPEN) websocket.send('ping');
+                }, 20000);
             }
             function onClose(event) {
                 console.log('Connection closed');
@@ -658,10 +896,10 @@
             }
             
             function onMessage(event){
-                    console.log('Received:', event.data);
+                    // console.log('Received:', event.data);
                 if((event.data[0] == '[' || event.data[0] == '{') && event.data != "undefined"){
                     const data = JSON.parse(event.data);
-                    console.log('Received data:', data);
+                    // console.log('Received data:', data);
                     loadNodeDashboard(event.data);
                     document.getElementById('jsonMappingData').value = event.data;
                 }
@@ -677,17 +915,12 @@
                 setTimeout(initWebSocket, 2000);
             }
             
+        // Update both text and icon color
         function updateSocketStatus(connected) {
-            let statusElement = document.getElementById('socketStatus');
-            if (!statusElement) {
-                statusElement = document.createElement('div');
-                statusElement.id = 'socketStatus';
-                statusElement.style.fontWeight = 'bold';
-                statusElement.style.textAlign = 'center';
-                document.body.prepend(statusElement);
+            let icon = document.getElementById('socketStatusSvg');
+            if (icon) {
+                icon.querySelector('circle').setAttribute('fill', connected ? 'green' : 'red');
             }
-            statusElement.textContent = connected ? 'Connected' : 'Disconnected';
-            statusElement.style.color = connected ? 'green' : 'red';
         }
         function loadDataMapping() {
             fetch('/data-mapping')
@@ -710,13 +943,17 @@
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify(parsedData),
+                }).then(response => response.json())
+                .then(data => {
+                    console.log('Response from server:', data);
+                    document.getElementById('responseMessageMapping').textContent = 'Data mapping saved successfully!';
                 })
-                    .then(response => response.json())
-                    .then(data => {
-                        console.log('Saved data mapping:', data);
-                        alert(data.status || 'Data mapping saved successfully!');
-                    })
-                    .catch(error => console.error('Error saving data mapping:', error));
+                .catch(error => {
+                    console.error('Error submitting config:', error);
+                    document.getElementById('responseMessageMapping').textContent = 'Error: ' + error.message;
+                    document.getElementById('responseMessageMapping').style.color = 'red';
+                });
+                   
             } catch (error) {
                 alert('Invalid JSON format. Please correct it and try again.');
                 console.error('JSON Parsing Error:', error);
@@ -737,7 +974,70 @@
                 console.error("Invalid JSON data:", error);
                 return;
             }
-            
+            // Handle Modbus value set confirmation
+            if (typeof nodes === 'object' ){
+                if ( nodes.setModbusValue === 'ok') {
+                    // alert('Set Modbus value: OK');
+                    return;
+                } else if ( nodes.setModbusValue === 'fail') {
+                    // alert('Set Modbus value: Fail');
+                    return;
+                } else if ( nodes.setModbusValue === 'fail' &&  nodes.error) {
+                    // alert('Set Modbus value: Fail | ' + nodes.error);
+                    return;
+                }
+                
+            }
+            if (nodes.masterData) {
+                // Only show table for masterData, do not create node cards
+                const container = document.getElementById('nodeDataTables');
+                container.innerHTML = ''; // Clear previous tables
+                const masterData = nodes.masterData;
+                // Handle masterData as an array of objects
+                if (Array.isArray(masterData)) {
+                    let tableHtml = `
+                        <h3>Master Data</h3>
+                        <table style="width:100%;border-collapse:collapse;">
+                            <thead>
+                                <tr>
+                                    <th>Index</th>
+                                    <th>Type</th>
+                                    <th>Value</th>
+                                    <th>Raw value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${masterData.map(item => {
+                                    // Each item is like {"160":0,"type":"WORD","rawValue":[0,0]}
+                                    const key = Object.keys(item).find(k => k !== "rawValue" && k !== "type");
+                                    const value = item[key];
+                                    const type = item.type || '';
+                                    const raw = Array.isArray(item.rawValue) ? item.rawValue.join(', ') : '';
+                                    return `
+                                        <tr>
+                                            <td>${key}</td>
+                                            <td>${type}</td>
+                                            <td>${value}</td>
+                                            <td>${raw}</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                    container.innerHTML = tableHtml;
+                }
+
+
+                // Call updateEditAddressOptions when nodeDataTables changes
+                const nodeDataTables = document.getElementById('nodeDataTables');
+                const observer = new MutationObserver(updateEditAddressOptions);
+                observer.observe(nodeDataTables, { childList: true, subtree: true });
+
+                // Initial call
+                updateEditAddressOptions();
+                return;
+            }
             const dashboard = document.getElementById('nodeDashboard');
             dashboard.innerHTML = "\
             <div style=\"width: 100%; display: flex; justify-content: space-between; align-items: center; background-color: #f4f4f4; padding: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);\">\
@@ -809,6 +1109,63 @@
             // };
 
         }
+        
+        function sendEditCommand() {
+            const type = document.getElementById('edit_type').value;
+            const value = document.getElementById('edit_value').value;
+            const address = parseInt(document.getElementById('edit_address').value);
+            const cmd = {
+                cmnd: "setModbusValue",
+                id: 1,
+                type: type,
+                address: address,
+                value: value
+            };
+            if (window.websocket && window.websocket.readyState === WebSocket.OPEN) {
+                window.websocket.send(JSON.stringify(cmd));
+                // alert("Sent: " + JSON.stringify(cmd));
+                console.log("Sent: " + JSON.stringify(cmd));
+            } else {
+                alert("WebSocket not connected.");
+            }
+        }
+        // Update edit_value min/max based on type
+        document.getElementById('edit_type').addEventListener('change', function() {
+            const type = this.value;
+            const editValue = document.getElementById('edit_value');
+            if (type === "0") { // Coil
+                editValue.min = 0;
+                editValue.max = 1;
+                editValue.step = 1;
+            } else if (type === "1") { // Word
+                editValue.min = 0;
+                editValue.max = 65535;
+                editValue.step = 1;
+            } else if (type === "2") { // DWord
+                editValue.min = 0;
+                editValue.max = 4294967295;
+                editValue.step = 1;
+            }
+            editValue.value = '';
+        });
+
+        // Populate edit_address select with index values from the current table
+        function updateEditAddressOptions() {
+            const table = document.querySelector('#nodeDataTables table');
+            const select = document.getElementById('edit_address');
+            select.innerHTML = '';
+            if (table) {
+                const rows = table.querySelectorAll('tbody tr');
+                rows.forEach(row => {
+                    const idx = row.children[0].textContent;
+                    const option = document.createElement('option');
+                    option.value = idx;
+                    option.textContent = idx;
+                    select.appendChild(option);
+                });
+            }
+        }
+
         function createNodeDataTable(nodeId, dataSize, keyData, typeData) {
             const container = document.getElementById('nodeDataTables');
             const tableDiv = document.createElement('div');
@@ -957,6 +1314,7 @@
                         const newRow = tableBody.insertRow();
                         newRow.innerHTML = `
                             <td><input type="number" name="tags[]" value="${data.Tag[i]}" required></td>
+                            <td><input type="number" name="Offset[]" value="${data.Offset[i]}" required></td>
                             <td><input type="number" name="values[]" value="${data.Value[i]}" required></td>
                             <td><input type="number" name="types[]" value="${data.Type[i]}" required></td>
                             <td><button type="button" onclick="deleteRow(this)">Delete</button></td>
@@ -965,50 +1323,59 @@
                 }
             }
 
+            function loadEthernetConfig() {
+                fetch('/load-ethernet-config')
+                    .then(response => response.json())
+                    .then(data => {
+                        document.getElementById('ethDhcp').checked = data.dhcp || false;
+                        document.getElementById('ethIp').value = data.ip || '';
+                        document.getElementById('ethSubnet').value = data.subnet || '';
+                        document.getElementById('ethGateway').value = data.gateway || '';
+                        document.getElementById('ethDns').value = data.dns || '';
+                    })
+                    .catch(error => console.error('Error loading Ethernet config:', error));
+            }
+            function saveEthernetConfig() {
+                const config = {
+                    dhcp: document.getElementById('ethDhcp').checked,
+                    ip: document.getElementById('ethIp').value,
+                    subnet: document.getElementById('ethSubnet').value,
+                    gateway: document.getElementById('ethGateway').value,
+                    dns: document.getElementById('ethDns').value
+                };
+                fetch('/save-ethernet-config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                })
+                .then(response => response.json())
+                .then(data => alert(data.status || 'Ethernet config saved!'))
+                .catch(error => alert('Save failed: ' + error));
+            }
+            window.addEventListener('DOMContentLoaded', loadEthernetConfig);
+            
+            function resetEsp() {
+                document.getElementById('resetEspResponse').textContent = 'Resetting...';
+                fetch('/reset-esp', { method: 'POST' })
+                    .then(res => res.json())
+                    .then(data => {
+                        document.getElementById('resetEspResponse').textContent = data.status || 'Reset command sent!';
+                    })
+                    .catch(err => {
+                        document.getElementById('resetEspResponse').textContent = 'Reset failed: ' + err;
+                    });
+            }
+            fetch('/datablocks').then(r=>r.json()).then(showBlocksFromJson);
             // Fetch configuration from ESP on page load
             fetch('/load-modbus-config')
             .then(response => response.json())
             .then(data => updateFormFromESP(data))
             .catch(error => console.error('Error fetching configuration from ESP:', error));
-        // Submit Mesh Network Configuration
-        // function submitMeshConfig() {
-        //     const meshConfig = {
-        //         type: "ConfigPacket",
-        //         mac: "FF:FF:FF:FF:FF:FF", // Thay bằng giá trị MAC thực tế nếu cần
-        //         node_id: parseInt(document.getElementById('meshNodeId').value) || 1,
-        //         chan: parseInt(document.getElementById('meshChannel').value) || 1,
-        //         regBit: parseInt(document.getElementById('meshRegBit').value) || 170,
-        //         reg8: parseInt(document.getElementById('meshReg8').value) || 255,
-        //         reg16: parseInt(document.getElementById('meshReg16').value) || 65535,
-        //         role: document.getElementById('meshRole').value || "Broker",
-        //         ssid: document.getElementById('meshSSID').value || "I-Soft",
-        //         password: document.getElementById('meshPassword').value || "i-soft@2023",
-        //         macAddresses: document.getElementById('meshMacAddresses').value.split(',').map(mac => mac.trim()) || [],
-        //         model: document.getElementById('meshModel').value || "V15",
-        //         netId: document.getElementById('meshNetId').value || "101",
-        //         boardModel: document.getElementById('boardModel').value || "0"
-        //     };
 
-        //     console.log('Submitting Mesh Network config:', meshConfig);
-
-        //     fetch('/save-mesh-config/', {
-        //         method: 'POST',
-        //         headers: {
-        //             'Content-Type': 'application/json',
-        //         },
-        //         body: JSON.stringify(meshConfig),
-        //     })
-        //         .then(response => response.json())
-        //         .then(data => {
-        //             console.log('Response from server:', data);
-        //             alert(data.status || 'Mesh Network configuration saved successfully!');
-        //         })
-        //         .catch(error => console.error('Error submitting Mesh Network config:', error));
-        // }
-        // Function to submit Mesh Configuration
         function submitMeshConfig() {
             const form = document.getElementById('meshConfigForm');
             const meshConfig = {
+                meshEnable: form.MeshEnable.checked, // Get the checkbox state
                 BrokerAddress: form.brokerAddress.value, // Save MAC address as a string
                 wifiChannel: parseInt(form.wifiChannel.value),
                 id: parseInt(form.nodeId.value),
@@ -1020,7 +1387,8 @@
                 boardModel: form.boardModel.value,
                 classDataRequest: form.classDataRequest.value,
                 communicationTime: parseInt(form.communicationTime.value) || 0, // Default to 0 if not provided
-                loraEnb: form.loraEnb.checked
+                loraEnb: form.loraEnb.checked,
+                buzzEnb: form.buzzEnb.checked
             };
 
             console.log('Submitting Mesh config:', meshConfig);
@@ -1057,6 +1425,8 @@
                     document.getElementById('classDataRequest').value = data.classDataRequest || 'A';
                     document.getElementById('communicationTime').value = data.communicationTime || 0; // Default to 0 if not provided
                     document.getElementById('loraEnb').checked = data.loraEnb || false;
+                    document.getElementById('buzzEnb').checked = data.buzzEnb || false;
+                    document.getElementById('MeshEnable').checked = data.meshEnable || false; // Set the checkbox state
                 })
                 .catch(error => console.error('Error loading Mesh config:', error));
         }
@@ -1078,7 +1448,9 @@
             const role = form.role.value;
             const com = form.com.value;
             const id = parseInt(form.id.value);
-            const slaveip = form.slaveip.value.split(',').map(Number);const tags = Array.from(document.querySelectorAll('input[name="tags[]"]')).map(input => parseInt(input.value)); // Chuyển đổi Tag thành số
+            const slaveip = form.slaveip.value.split(',').map(Number);
+            const tags = Array.from(document.querySelectorAll('input[name="tags[]"]')).map(input => parseInt(input.value)); // Chuyển đổi Tag thành số
+            const offsets = Array.from(document.querySelectorAll('input[name="Offset[]"]')).map(input => parseInt(input.value)); // Chuyển đổi Value thành số
             const values = Array.from(document.querySelectorAll('input[name="values[]"]')).map(input => parseInt(input.value)); // Chuyển đổi Value thành số
             const types = Array.from(document.querySelectorAll('input[name="types[]"]')).map(input => parseInt(input.value)); // Chuyển đổi Type thành số
 
@@ -1088,6 +1460,7 @@
                 id: id,
                 slaveip: slaveip,
                 Tag: tags,
+                Offset: offsets,
                 Value: values,
                 Type: types
             };
@@ -1270,6 +1643,74 @@
                 alert(data.status || 'LoRa E32 configuration saved successfully!');
             })
             .catch(error => console.error('Error submitting LoRa E32 config:', error));
+        }
+        // Dropdown logic
+        document.addEventListener('DOMContentLoaded', function() {
+            const btn = document.getElementById('userDropdownBtn');
+            const menu = document.getElementById('userDropdownMenu');
+            btn.onclick = function(e) {
+                e.stopPropagation();
+                menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+            };
+            document.body.addEventListener('click', function() {
+                menu.style.display = 'none';
+            });
+        });
+
+        // Modal logic
+        function showChangePasswordModal() {
+            document.getElementById('changePasswordModal').style.display = 'flex';
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmPassword').value = '';
+            document.getElementById('changePasswordError').textContent = '';
+            document.getElementById('userDropdownMenu').style.display = 'none';
+            // Focus on the new password field
+            document.getElementById('newPassword').focus();
+            // Add keydown event listeners for Enter key
+            document.getElementById('newPassword').addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    submitChangePassword();
+                }
+            });
+
+            document.getElementById('confirmPassword').addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    submitChangePassword();
+                }
+            });
+        }
+
+        function closeChangePasswordModal() {
+            document.getElementById('changePasswordModal').style.display = 'none';
+        }
+
+        function submitChangePassword() {
+            const newPass = document.getElementById('newPassword').value;
+            const confirmPass = document.getElementById('confirmPassword').value;
+            const err = document.getElementById('changePasswordError');
+            if (!newPass || !confirmPass) {
+                err.textContent = 'Please enter both fields.';
+                return;
+            }
+            if (newPass !== confirmPass) {
+                err.textContent = 'Passwords do not match.';
+                return;
+            }
+            if (window.websocket && window.websocket.readyState === WebSocket.OPEN) {
+                window.websocket.send(JSON.stringify({ cmnd: "changePassword", data: newPass }));
+                closeChangePasswordModal();
+                alert('Password change command sent.');
+            } else {
+                err.textContent = 'WebSocket not connected.';
+            }
+        }
+        
+        function logoutUser() {
+            if (window.websocket && window.websocket.readyState === WebSocket.OPEN) {
+                window.websocket.send(JSON.stringify({ cmnd: "logout" }));
+            }
+            // Optionally redirect or reload
+            setTimeout(function() { window.location.reload(); }, 500);
         }
     </script>
 </body>
