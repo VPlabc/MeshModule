@@ -10,7 +10,7 @@
 struct NodeDatas {
     int ID;
     int netId;
-    std::string macAddress;
+    char macAddress[18]; // MAC address as "XX:XX:XX:XX:XX:XX" + null terminator
     std::vector<uint8_t> data;
     uint8_t dataSize;
     float dataSuccessRate;
@@ -23,7 +23,7 @@ extern std::map<int, NodeDatas> nodeDataMaps;
 NodeDatas nodeDatas;
 
 // Function to update or add node data
-void updateNodeData(const dataPacket &packet, const std::string &macAddress) {
+void updateNodeData(const dataPacket &packet, const char* macAddress) {
     nodeDatas.ID = packet.ID;
     nodeDatas.netId = packet.netId;
     nodeDatas.data.assign(packet.data, packet.data + packet.dataSize);
@@ -33,8 +33,9 @@ void updateNodeData(const dataPacket &packet, const std::string &macAddress) {
     auto currentTime = std::chrono::steady_clock::now();
     nodeDatas.lastReceivedTimes = currentTime;
 
-    // Store the MAC address (assuming you add a field for it in NodeDatas)
-    nodeDatas.macAddress = macAddress;
+    // Copy MAC address to fixed-size char array
+    strncpy(nodeDatas.macAddress, macAddress, sizeof(nodeDatas.macAddress) - 1);
+    nodeDatas.macAddress[sizeof(nodeDatas.macAddress) - 1] = '\0';
 
     // Update the map with the new data
     nodeDataMaps[packet.ID] = nodeDatas;
@@ -55,9 +56,8 @@ void calculateSuccessRates() {
     }
 }
 
-String LoadDataMapping() {
+void LoadDataMapping(char* buffer, size_t bufferSize) {
     // Load data mapping from JSON file
-    String jsonString;
     if (!LittleFS.exists(DATA_MAPPING_FILE)) {
         // Tạo file mặc định nếu chưa tồn tại
         File defaultFile = LittleFS.open(DATA_MAPPING_FILE, "w");
@@ -71,84 +71,90 @@ String LoadDataMapping() {
     }
     File file = LittleFS.open(DATA_MAPPING_FILE, "r");
     if (file) {
-        jsonString = file.readString();
+        size_t len = file.readBytes(buffer, bufferSize - 1);
+        buffer[len] = '\0'; // Null-terminate
         file.close();
     } else {
         Serial.println("Failed to open DataMapping.json");
+        if (bufferSize > 0) buffer[0] = '\0';
     }
-    return jsonString;
 }
 
-String createJsonForWebSocket() {
+void createJsonForWebSocket(char* outBuffer, size_t outBufferSize) {
     DynamicJsonDocument doc(4096); // Adjust size as needed
     JsonArray nodesArray = doc.to<JsonArray>();
+
+    char mappingBuffer[4096];
+    LoadDataMapping(mappingBuffer, sizeof(mappingBuffer));
+
+    DynamicJsonDocument mappingDoc(4096);
+    DeserializationError error = deserializeJson(mappingDoc, mappingBuffer);
+
+    JsonArray mappingArray = mappingDoc.as<JsonArray>();
 
     for (const auto &entry : nodeDataMaps) {
         const NodeDatas &node = entry.second;
         JsonObject nodeObject = nodesArray.createNestedObject();
 
         nodeObject["nodeId"] = node.ID;
-        nodeObject["mac"] = node.macAddress; // Replace with actual MAC if available
+        nodeObject["mac"] = node.macAddress;
         nodeObject["netId"] = node.netId;
-        nodeObject["successRate"] = String(node.dataSuccessRate, 1) + "%";
+
+        char successRateStr[16];
+        snprintf(successRateStr, sizeof(successRateStr), "%.1f%%", node.dataSuccessRate);
+        nodeObject["successRate"] = successRateStr;
 
         std::time_t currentTime = std::time(nullptr);
         double timeDiff = std::difftime(currentTime, node.timestamp);
-        nodeObject["timeAgo"] = String(static_cast<int>(timeDiff)) + " seconds ago";
+
+        char timeAgoStr[32];
+        snprintf(timeAgoStr, sizeof(timeAgoStr), "%d seconds ago", static_cast<int>(timeDiff));
+        nodeObject["timeAgo"] = timeAgoStr;
 
         JsonArray dataArray = nodeObject.createNestedArray("data");
         for (uint8_t byte : node.data) {
             dataArray.add(byte);
         }
-        // Parse the JSON string from LoadDataMapping
-        String jsonMapping = LoadDataMapping();
-        // Serial.println(jsonMapping);
-        // Parse the JSON string from LoadDataMapping
-        DynamicJsonDocument mappingDoc(4096); // Adjust size as needed
-        DeserializationError error = deserializeJson(mappingDoc, jsonMapping);
 
-        JsonArray mappingArray = mappingDoc.as<JsonArray>();
         if (!error) {
             for (JsonObject mappingObject : mappingArray) {
                 if (mappingObject["ID"] == node.ID) {
-
                     JsonArray keysArray = mappingObject["keys"].as<JsonArray>();
                     JsonArray keysNestedArray = nodeObject.createNestedArray("keys");
                     for (JsonVariant key : keysArray) {
-                    keysNestedArray.add(key);
+                        keysNestedArray.add(key);
                     }
-                    
+
                     JsonArray typesArray = mappingObject["types"].as<JsonArray>();
                     JsonArray typesNestedArray = nodeObject.createNestedArray("type");
                     for (JsonVariant type : typesArray) {
-                    typesNestedArray.add(type);
+                        typesNestedArray.add(type);
                     }
                     break;
                 }
             }
         } else {
             Serial.println("Failed to parse JSON mapping");
-            nodeObject.createNestedArray("types"); // Empty keys array
-            nodeObject.createNestedArray("keys"); // Empty keys array
+            nodeObject.createNestedArray("types");
+            nodeObject.createNestedArray("keys");
         }
     }
 
-    String jsonString;
-    serializeJson(nodesArray, jsonString);
-    return jsonString;
-    // Clear the document to free memory
+    serializeJson(nodesArray, outBuffer, outBufferSize);
     doc.clear();
 }
-String createJsonForMqttt() {
+
+void createJsonForMqttt(char* outBuffer, size_t outBufferSize) {
     DynamicJsonDocument doc(4096); // Adjust size as needed
     JsonArray nodesArray = doc.to<JsonArray>();
-    // Parse the JSON string from LoadDataMapping
-    String jsonMapping = LoadDataMapping();
-    // Parse the JSON string from LoadDataMapping
-    DynamicJsonDocument mappingDoc(4096); // Adjust size as needed
-    DeserializationError error = deserializeJson(mappingDoc, jsonMapping);
+
+    char mappingBuffer[4096];
+    LoadDataMapping(mappingBuffer, sizeof(mappingBuffer));
+
+    DynamicJsonDocument mappingDoc(4096);
+    DeserializationError error = deserializeJson(mappingDoc, mappingBuffer);
     JsonArray mappingArray = mappingDoc.as<JsonArray>();
-    
+
     if (!error) {
         for (const auto &entry : nodeDataMaps) {
             const NodeDatas &node = entry.second;
@@ -157,21 +163,19 @@ String createJsonForMqttt() {
 
             JsonArray dataArray = nodeObject.createNestedArray("data");
             for (uint8_t byte : node.data) {
-
                 dataArray.add(byte);
             }
             for (JsonObject mappingObject : mappingArray) {
                 if (mappingObject["ID"] == node.ID) {
-
                     JsonArray keysArray = mappingObject["keys"].as<JsonArray>();
                     JsonArray keysNestedArray = nodeObject.createNestedArray("keys");
                     JsonArray typesArray = mappingObject["types"].as<JsonArray>();
                     JsonArray typesNestedArray = nodeObject.createNestedArray("type");
                     for (JsonVariant key : keysArray) {
-                    keysNestedArray.add(key);
+                        keysNestedArray.add(key);
                     }
                     for (JsonVariant type : typesArray) {
-                    typesNestedArray.add(type);
+                        typesNestedArray.add(type);
                     }
                     break;
                 }
@@ -181,10 +185,7 @@ String createJsonForMqttt() {
         Serial.println("Failed to parse JSON mapping");
     }
 
-    String jsonString;
-    serializeJson(nodesArray, jsonString);
-    return jsonString;
-    // Clear the document to free memory
+    serializeJson(nodesArray, outBuffer, outBufferSize);
     doc.clear();
 }
 // Function to print data for all nodes

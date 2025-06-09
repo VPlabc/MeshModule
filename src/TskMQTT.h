@@ -32,7 +32,7 @@ extern String ssid;
 extern String pass;
 extern String conId;
 extern String mqttTopicStat;
-extern String mqttTopic;
+extern String mqttTopicPub;
 extern String mqttTopicSub;
 extern int mqttKeepAlive;
 extern bool mqttCleanSession;

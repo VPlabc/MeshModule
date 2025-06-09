@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Đăng nhập - i-Soft</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            background: #f4f6fb;
+            font-family: Arial, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .login-container {
+            background: #fff;
+            padding: 32px 28px 24px 28px;
+            border-radius: 10px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+            width: 350px;
+            text-align: center;
+        }
+        .logo {
+            margin-bottom: 24px;
+        }
+        .logo img {
+            width: 80px;
+            height: 80px;
+        }
+        .login-title {
+            font-size: 1.5em;
+            margin-bottom: 18px;
+            color: #1a237e;
+            font-weight: bold;
+        }
+        .login-form input[type="text"],
+        .login-form input[type="password"] {
+            width: 100%;
+            padding: 10px 12px;
+            margin: 8px 0 16px 0;
+            border: 1px solid #bdbdbd;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+        .login-form button {
+            width: 100%;
+            padding: 10px;
+            background: #1a73e8;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .login-form button:hover {
+            background: #1565c0;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">
+            <!-- Thay thế src bằng đường dẫn logo i-Soft của bạn -->
+            <img src="https://i.imgur.com/8Km9tLL.png" alt="i-Soft Logo">
+        </div>
+        <div class="login-title">Đăng nhập i-Soft</div>
+        <form class="login-form" action="#" method="post">
+            <input type="text" name="username" placeholder="Tên đăng nhập" required>
+            <input type="password" name="password" placeholder="Mật khẩu" required>
+            <button type="submit">Đăng nhập</button>
+        </form>
+    </div>
+</body>
+</html>

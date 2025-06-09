@@ -1,6 +1,7 @@
 #ifndef Main_H
 #define Main_H
 
+#define USE_VEHICLE
 #define TCP_ETH
 #define USE_SD
 #define USE_LITTLEFS // Ensure LittleFS is used
@@ -19,7 +20,7 @@
 #endif// TCP_ETH
 
 #ifdef USE_SERIAL2
-#define USE_Modbus
+// #define USE_Modbus
 #define USE_MQTT
 #endif// USE_SERIAL2
 

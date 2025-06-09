@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard Cửa Cuốn</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Google Fonts & Font Awesome for icons -->
+    <link href="https://fonts.googleapis.com/css?family=Roboto:400,700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 0;
+        }
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #fff;
+            padding: 0.5rem 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+        }
+        .navbar .logo {
+            display: flex;
+            align-items: center;
+        }
+        .navbar .logo img {
+            height: 40px;
+            margin-right: 10px;
+        }
+        .navbar .user {
+            display: flex;
+            align-items: center;
+            font-weight: 500;
+            color: #333;
+        }
+        .navbar .user i {
+            margin-right: 8px;
+            color: #1976d2;
+        }
+        .dashboard {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        .status-cards {
+            display: flex;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .status-card {
+            flex: 1;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .status-card .icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .status-card.closed .icon { color: #e53935; }
+        .status-card.opened .icon { color: #43a047; }
+        .status-card.partial .icon { color: #fbc02d; }
+        .status-card .status {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 0.3rem;
+        }
+        .status-card .updated {
+            font-size: 0.95rem;
+            color: #888;
+        }
+        .control-cards {
+            display: flex;
+            gap: 2rem;
+        }
+        .control-card {
+            flex: 1;
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+            padding: 2rem 1.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .control-card h3 {
+            margin: 0 0 1.2rem 0;
+            font-size: 1.3rem;
+            color: #1976d2;
+        }
+        .control-buttons {
+            display: flex;
+            gap: 1.2rem;
+        }
+        .control-buttons button {
+            border: none;
+            border-radius: 50%;
+            width: 56px;
+            height: 56px;
+            font-size: 1.5rem;
+            color: #fff;
+            background: #bdbdbd;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .control-buttons .btn-open { background: #43a047; }
+        .control-buttons .btn-close { background: #e53935; }
+        .control-buttons .btn-stop { background: #fbc02d; color: #333; }
+        .control-buttons button:active {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+        }
+        @media (max-width: 900px) {
+            .status-cards, .control-cards {
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logo">
+            <a href="https://i-soft.com.vn" target="_blank">
+                <img src="https://i-soft.com.vn/wp-content/uploads/2022/09/logo.png" alt="i-Soft Logo">
+            </a>
+            <span>i-Soft Dashboard</span>
+        </div>
+        <div class="user">
+            <i class="fa-solid fa-user-circle"></i>
+            <span id="username">User</span>
+        </div>
+    </nav>
+    <div class="dashboard">
+        <!-- Status Cards -->
+        <div class="status-cards">
+            <div class="status-card closed" id="status-card-1">
+                <div class="icon"><i class="fa-solid fa-door-closed"></i></div>
+                <div class="status">Đóng</div>
+                <div class="updated" id="updated-1">Cập nhật: --:--:--</div>
+            </div>
+            <div class="status-card opened" id="status-card-2">
+                <div class="icon"><i class="fa-solid fa-door-open"></i></div>
+                <div class="status">Mở</div>
+                <div class="updated" id="updated-2">Cập nhật: --:--:--</div>
+            </div>
+            <div class="status-card partial" id="status-card-3">
+                <div class="icon"><i class="fa-solid fa-grip-lines"></i></div>
+                <div class="status">Lưng lửng</div>
+                <div class="updated" id="updated-3">Cập nhật: --:--:--</div>
+            </div>
+        </div>
+        <!-- Control Cards -->
+        <div class="control-cards">
+            <div class="control-card" id="control-card-1">
+                <h3>Cửa cuốn 1</h3>
+                <div class="control-buttons">
+                    <button class="btn-open" onclick="sendAction(1, 'open')" title="Mở"><i class="fa-solid fa-arrow-up"></i></button>
+                    <button class="btn-stop" onclick="sendAction(1, 'stop')" title="Dừng"><i class="fa-solid fa-pause"></i></button>
+                    <button class="btn-close" onclick="sendAction(1, 'close')" title="Đóng"><i class="fa-solid fa-arrow-down"></i></button>
+                </div>
+            </div>
+            <div class="control-card" id="control-card-2">
+                <h3>Cửa cuốn 2</h3>
+                <div class="control-buttons">
+                    <button class="btn-open" onclick="sendAction(2, 'open')" title="Mở"><i class="fa-solid fa-arrow-up"></i></button>
+                    <button class="btn-stop" onclick="sendAction(2, 'stop')" title="Dừng"><i class="fa-solid fa-pause"></i></button>
+                    <button class="btn-close" onclick="sendAction(2, 'close')" title="Đóng"><i class="fa-solid fa-arrow-down"></i></button>
+                </div>
+            </div>
+            <div class="control-card" id="control-card-3">
+                <h3>Cửa cuốn 3</h3>
+                <div class="control-buttons">
+                    <button class="btn-open" onclick="sendAction(3, 'open')" title="Mở"><i class="fa-solid fa-arrow-up"></i></button>
+                    <button class="btn-stop" onclick="sendAction(3, 'stop')" title="Dừng"><i class="fa-solid fa-pause"></i></button>
+                    <button class="btn-close" onclick="sendAction(3, 'close')" title="Đóng"><i class="fa-solid fa-arrow-down"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        // Demo: Fake user
+        document.getElementById('username').textContent = 'Nguyễn Văn A';
+
+        // Demo: Fake status update
+        function updateStatus(cardId, status, time) {
+            const card = document.getElementById('status-card-' + cardId);
+            card.classList.remove('closed', 'opened', 'partial');
+            card.classList.add(status);
+            card.querySelector('.status').textContent =
+                status === 'closed' ? 'Đóng' :
+                status === 'opened' ? 'Mở' : 'Lưng lửng';
+            card.querySelector('.updated').textContent = 'Cập nhật: ' + time;
+        }
+
+        // Simulate status update
+        setInterval(() => {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('vi-VN');
+            // Random status for demo
+            const statuses = ['closed', 'opened', 'partial'];
+            for (let i = 1; i <= 3; i++) {
+                const status = statuses[Math.floor(Math.random() * 3)];
+                updateStatus(i, status, timeStr);
+            }
+        }, 5000);
+
+        // Action logic
+        let actionTimers = [null, null, null];
+        function sendAction(door, action) {
+            // door: 1,2,3; action: 'open', 'close', 'stop'
+            const cardId = door;
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('vi-VN');
+            if (action === 'open' || action === 'close') {
+                // If pressed again within 2s, set partial
+                if (actionTimers[door-1]) {
+                    clearTimeout(actionTimers[door-1]);
+                    updateStatus(cardId, 'partial', timeStr);
+                    actionTimers[door-1] = null;
+                } else {
+                    // Set opened/closed after 2s if not interrupted
+                    updateStatus(cardId, action === 'open' ? 'opened' : 'closed', timeStr);
+                    actionTimers[door-1] = setTimeout(() => {
+                        updateStatus(cardId, action === 'open' ? 'opened' : 'closed', timeStr);
+                        actionTimers[door-1] = null;
+                    }, 2000);
+                }
+            } else if (action === 'stop') {
+                updateStatus(cardId, 'partial', timeStr);
+                if (actionTimers[door-1]) {
+                    clearTimeout(actionTimers[door-1]);
+                    actionTimers[door-1] = null;
+                }
+            }
+        }
+    </script>
+</body>
+</html>

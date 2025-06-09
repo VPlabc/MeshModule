@@ -1,17 +1,21 @@
 #include <Arduino.h>
 
 void initializeSPI() {
-  SPI.begin(SCK_PIN, MISO_PIN, MOSI_PIN); // SCK, MISO, MOSI
+  if(SD_SCK_PIN == -1 && SD_MOSI_PIN == -1 && SD_MISO_PIN == -1){
+        SPI.begin(SCK_PIN, MISO_PIN, MOSI_PIN); // SCK, MISO, MOSI
+  }else{
+        SPI.begin(SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN); // SCK, MISO, MOSI
+    }
 }
 
 
 void initializeSDCard() {
 #ifdef USE_SD
-  if (!SD.begin(SD_CS_PIN)) {
-    Serial.println("\n SD card failed to initialize! ❌");
+  if (!SD.begin(SD_CS_PIN, SPI, 400000)) { // 4MHz SPI frequency
+    Serial.println("\n❌ SD card failed to initialize! ❌");
     Serial.println((" CS Pin: " + String(SD_CS_PIN)));
   } else {
-    Serial.println("\n SD Card initialized.  ✅");
+    Serial.println("\n✅   SD Card initialized.  ✅");
   }
 #endif//USE_SD
 }
@@ -108,4 +112,47 @@ void initializeFileSytem(){
             return;
         }
     }
+}
+
+
+void initHardware() {
+
+    // #ifdef Module_10O4I
+    if(BUZZ == -1){
+        Serial.println("⚠️   BUZZ pin not set");
+    }else if(BUZZ > 0){
+        pinMode(BUZZ, OUTPUT);
+        digitalWrite(BUZZ, LOW);
+        digitalWrite(BUZZ, HIGH);delay(50);digitalWrite(BUZZ, LOW);
+    }
+    if(Y8 == -1){
+        Serial.println("⚠️   Y8 pin not set");
+    }else if(Y8 > 0){
+        pinMode(Y8, OUTPUT);
+        digitalWrite(Y8, LOW);
+    }
+    if(Y9 == -1){
+        Serial.println("⚠️   Y9 pin not set");
+    }else if(Y9 > 0){   
+        pinMode(Y9, OUTPUT);
+        digitalWrite(Y9, LOW);
+    }
+
+    if(LED_STT == -1){
+        Serial.println("⚠️   LED_STT pin not set");
+        LED_STT = 0; // Set to 0 to disable LED functionality
+    }else if(LED_STT > 0){
+        pinMode(LED_STT, OUTPUT);
+        digitalWrite(LED_STT, HIGH);delay(100);
+        digitalWrite(LED_STT, LOW);delay(100);
+        digitalWrite(LED_STT, HIGH);delay(100);
+        digitalWrite(LED_STT, LOW);delay(100);
+    }
+
+    if(I2C_SDA == -1 || I2C_SCL == -1){
+        Serial.println("⚠️   I2C pins not set");
+    }else if(I2C_SDA > 0 && I2C_SCL > 0){
+        Wire.begin(I2C_SDA, I2C_SCL); // Initialize I2C with specified pins
+    }
+    
 }

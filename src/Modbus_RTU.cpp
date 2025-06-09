@@ -108,13 +108,13 @@ uint16_t CoilGet(TRegister* reg, uint16_t val0);
 // HardwareSerial1 MySerial1_(1);
 // #define Serial2 MySerial1_
 
-String connId[4] = {"connId1", "connId2", "connId3", "connId4"};
-String Tag[40] = {"tag1", "tag2", "tag3", "tag4"};
+// String connId[4] = {"connId1", "connId2", "connId3", "connId4"};
+// String Tag[40] = {"tag1", "tag2", "tag3", "tag4"};
 JSONVar MobusSettings;
 JSONVar DataBlocks;
 
-extern String connId[4];
-extern String Tag[40];
+// extern String connId[4];
+// extern String Tag[40];
 extern int AddrOffset;
 
 //Task1 :
@@ -354,79 +354,75 @@ uint16_t CoilGet(TRegister* reg, uint16_t val0) {
 
 String Modbus_Prog::GetJson(){
     String json = "{\"masterData\":[";
-  // --- Thêm log giá trị đọc từ DataBlocks ---
+    // --- Thêm log giá trị đọc từ DataBlocks ---
     if (JSON.typeof(DataBlocks) != "undefined" && DataBlocks.hasOwnProperty("block")) {
-        // DB_LN("DataBlock Values:");
-        for (int b = 0; b < (int)DataBlocks["block"].length(); b++) {
-            int amount = (int)DataBlocks["block"][b]["amount"];
-            for (int j = 0; j < amount; j++) {
-                if (j > 0 || b > 0) json += ",";
-                int addr = (int)DataBlocks["block"][b]["valueFrom"] + j;
-                int type = (int)DataBlocks["block"][b]["typeFrom"];
-                json += "{\"";
-                json += String(addr + (int)DataBlocks["block"][b]["offset"]);
-                json += "\":";
-                if (type == 0) {
-                    json += coils[addr] ? 1 : 0;
-                    json += ",\"type\":\"COIL\",\"rawValue\":[" + String(inputRegisters[addr]) + "]}";
-                } else if (type == 1) {
-                    json += String(inputRegisters[addr]);
-                    json += ",\"type\":\"WORD\",\"rawValue\":[" + String(inputRegisters[addr]) + "]}";
-                } else if (type == 2) {
-                    uint32_t dwordValue = DWORD(
-                        inputRegisters[addr],
-                        inputRegisters[addr + 1]
-                    );
-                    json += String(dwordValue);
-                    json += ",\"type\":\"DWORD\",\"rawValue\":[" + String(inputRegisters[addr]) + "," + String(inputRegisters[addr + 1]) + "]}";
-                } else if (type == 3) {
-                    float floatValue = (float)DWORD(
-                        inputRegisters[addr],
-                        inputRegisters[addr + 1]
-                    );
-                    json += String(floatValue);
-                    json += ",\"type\":\"FLOAT\",\"rawValue\":[" + String(inputRegisters[addr]) + "," + String(inputRegisters[addr + 1]) + "]}";
-                }
-            }
+      for (int b = 0; b < (int)DataBlocks["block"].length(); b++) {
+        int amount = (int)DataBlocks["block"][b]["amount"];
+        for (int j = 0; j < amount; j++) {
+          if (j > 0 || b > 0) json += ",";
+          int addr = (int)DataBlocks["block"][b]["valueFrom"] + j;
+          int type = (int)DataBlocks["block"][b]["typeFrom"];
+          json += "{\"";
+          json += String(addr + (int)DataBlocks["block"][b]["offset"]);
+          json += "\":";
+          if (type == 0) {
+            json += coils[addr] ? 1 : 0;
+            json += ",\"type\":\"COIL\",\"rawValue\":[" + String(inputRegisters[addr]) + "]}";
+          } else if (type == 1) {
+            json += String(inputRegisters[addr]);
+            json += ",\"type\":\"WORD\",\"rawValue\":[" + String(inputRegisters[addr]) + "]}";
+          } else if (type == 2) {
+            uint32_t dwordValue = DWORD(
+              inputRegisters[addr],
+              inputRegisters[addr + 1]
+            );
+            json += String(dwordValue);
+            json += ",\"type\":\"DWORD\",\"rawValue\":[" + String(inputRegisters[addr]) + "," + String(inputRegisters[addr + 1]) + "]}";
+          } else if (type == 3) {
+            float floatValue = (float)DWORD(
+              inputRegisters[addr],
+              inputRegisters[addr + 1]
+            );
+            json += String(floatValue);
+            json += ",\"type\":\"FLOAT\",\"rawValue\":[" + String(inputRegisters[addr]) + "," + String(inputRegisters[addr + 1]) + "]}";
+          }
         }
-        if(MobusSettings.hasOwnProperty("Value") && MobusSettings.hasOwnProperty("Type")){
-            for (int i = 0; i < MobusSettings["Value"].length(); i++) {
-              if(MobusSettings["Value"].length() > 0){
-                json += ",";
-                int addr = (int)MobusSettings["Value"][i];
-                int type = (int)MobusSettings["Type"][i];
-                json += "{\"" + String(addr + (int)MobusSettings["Offset"][i]) + "\":";
-                if (type == 0) {
-                    json += coils[addr] ? 1 : 0;
-                    json += ",\"type\":\"COIL\",\"rawValue\":[" + String(holdingRegisters[addr]) + "]}";
-                } else if (type == 1) {
-                    json += String(holdingRegisters[addr]);
-                    json += ",\"type\":\"WORD\",\"rawValue\":[" + String(holdingRegisters[addr]) + "]}";
-                } else if (type == 2) {
-                    uint32_t dwordValue = DWORD(
-                        holdingRegisters[addr],
-                        holdingRegisters[addr + 1]
-                    );
-                    json += String(dwordValue);
-                    json += ",\"type\":\"DWORD\",\"rawValue\":[" + String(holdingRegisters[addr]) + "," + String(holdingRegisters[addr + 1]) + "]}";
-                } else if (type == 3) {
-                    float floatValue = (float)DWORD(
-                        holdingRegisters[addr],
-                        holdingRegisters[addr + 1]
-                    );
-                    json += String(floatValue);
-                    json += ",\"type\":\"FLOAT\",\"rawValue\":[" + String(holdingRegisters[addr]) + "," + String(holdingRegisters[addr + 1]) + "]}";
-                }
-              }
+      }
+      if(MobusSettings.hasOwnProperty("Value") && MobusSettings.hasOwnProperty("Type")){
+        for (int i = 0; i < MobusSettings["Value"].length(); i++) {
+          if(MobusSettings["Value"].length() > 0){
+            json += ",";
+            int addr = (int)MobusSettings["Value"][i];
+            int type = (int)MobusSettings["Type"][i];
+            json += "{\"" + String(addr + (int)MobusSettings["Offset"][i]) + "\":";
+            if (type == 0) {
+              json += coils[addr] ? 1 : 0;
+              json += ",\"type\":\"COIL\",\"rawValue\":[" + String(holdingRegisters[addr]) + "]}";
+            } else if (type == 1) {
+              json += String(holdingRegisters[addr]);
+              json += ",\"type\":\"WORD\",\"rawValue\":[" + String(holdingRegisters[addr]) + "]}";
+            } else if (type == 2) {
+              uint32_t dwordValue = DWORD(
+                holdingRegisters[addr],
+                holdingRegisters[addr + 1]
+              );
+              json += String(dwordValue);
+              json += ",\"type\":\"DWORD\",\"rawValue\":[" + String(holdingRegisters[addr]) + "," + String(holdingRegisters[addr + 1]) + "]}";
+            } else if (type == 3) {
+              float floatValue = (float)DWORD(
+                holdingRegisters[addr],
+                holdingRegisters[addr + 1]
+              );
+              json += String(floatValue);
+              json += ",\"type\":\"FLOAT\",\"rawValue\":[" + String(holdingRegisters[addr]) + "," + String(holdingRegisters[addr + 1]) + "]}";
             }
+          }
         }
-    
-        json += "]}";
-        // DB_LN(logStr);
-        return json;
-        json = "";
+      }
     }
-}
+    json += "]}";
+    return json;
+  }
 
 void Modbus_Prog::MonitorData(){
     DB_LN("--------------------------------------------------------------------------------");
@@ -549,6 +545,7 @@ void Modbus_Prog::modbus_loop(int Timeout) {
                 }
           }
         }
+
         // MonitorData();
       }
       // MonitorData();

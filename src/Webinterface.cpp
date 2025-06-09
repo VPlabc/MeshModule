@@ -5,8 +5,18 @@
 #include "LoRa.h"
 LoRaFunction configLoRa;
 
+//////////////////////////////////////////////////////////////
+#define  USE_OTA
+
+#ifdef USE_OTA
+#include <ESPAsyncWebServer.h>
+#include <AsyncElegantOTA.h>
+#endif//USE_OTA
+
 #include "Modbus_RTU.h"
 Modbus_Prog WebModbusCom;
+
+#include <EEPROM.h>
 
 const String localIPURL = "http://192.168.4.1";	 // a string version of the local IP with http, used for redirecting clients to your webpage
 
@@ -24,7 +34,7 @@ String ssid = "I-Soft";
 String pass = "i-soft@2023";
 String conId = "b8e54d33-b34a-45ab-b76f-62c8a9abc6c4";
 String mqttTopicStat = "iSoftMesh/Status";
-String mqttTopic = "iSoftMesh/data";
+String mqttTopicPub = "iSoftMesh/data";
 String mqttTopicSub = "iSoftMesh/data/sub";
 int mqttKeepAlive = 60;
 bool mqttCleanSession = true;
@@ -39,6 +49,7 @@ int timezone = 7;
 bool mqttIsConnected = false;
 bool socketConnected = false;
 bool WebConnected = false;
+
 
 ////////////////////////// permission /////////////////////////
 
@@ -151,7 +162,7 @@ String readPasswordFromBinFile(byte Level) {
 void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
     AwsFrameInfo *info = (AwsFrameInfo*)arg;
     if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
-      data[len] = 0;
+    //   data[len] = 0;
     //   if (strcmp((char*)data, "toggle") == 0) {
     //     ledState = !ledState;
     //     notifyClients();
@@ -177,12 +188,13 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
             }
         }
 
+
         if (permissionLevel > 0 && !error && doc.containsKey("cmnd")) {
             String cmnd = doc["cmnd"].as<String>();
 
             if (cmnd == "getPermissionLevel") {
                 String resp = "{\"permissionLevel\":" + String(permissionLevel) + "}";
-                ws.textAll(resp);
+                ws.textAll(resp);resp = "";
             } else if (cmnd == "logout") {
                 permissionLevel = 0;
                 ws.textAll("{\"logout\":\"success\"}");
@@ -201,6 +213,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
                 } else {
                     ws.textAll("{\"changePassword\":\"fail\"}");
                 }
+                newPass = "";
             }
             else if (cmnd == "setModbusValue") {
                 int modbusId = doc["id"] | 1;
@@ -224,12 +237,27 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
                     WebModbusCom.SetHoldingReg(modbusId, address, val);
                     success = true;
                 }
+                WebModbusCom.modbus_loop(10);
                 if (success) {
                     ws.textAll("{\"setModbusValue\":\"ok\"}");
+                    ws.textAll(WebModbusCom.GetJson().c_str());
                 } else {
                     ws.textAll("{\"setModbusValue\":\"fail\"}");
                 }
+                regType = "";
             }
+            else if (cmnd == "ResetRom") {
+                if (permissionLevel == 3) {
+                    EEPROM.writeLong(0, 0);
+                    bool success = EEPROM.commit();
+                    if (success) {
+                        ws.textAll("{\"ResetRom\":\"ok\"}");
+                    } else {
+                        ws.textAll("{\"ResetRom\":\"fail\"}");
+                    }
+                }
+            }
+            cmnd = "";doc.clear();
         }
     }
   }
@@ -246,9 +274,12 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
       case WS_EVT_DISCONNECT:
         Serial.printf("❌ WebSocket client #%u disconnected\n", client->id());
         socketConnected = false;
+        ws.cleanupClients();
+        ws.close(client->id());
         break;
       case WS_EVT_DATA:
         handleWebSocketMessage(arg, data, len);
+        
         break;
       case WS_EVT_PONG:
       case WS_EVT_ERROR:
@@ -267,6 +298,12 @@ void WebinterFace::SocketLoop() {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 void WebinterFace::setupWebConfig() {
     initWebSocket();
+    ////////////// Upload OTA  ////////////////
+        #ifdef USE_OTA
+        // if (MeshConfig.debug)
+         Serial.println("Starting OTA...");
+            AsyncElegantOTA.begin(&server);    // Start AsyncElegantOTA
+        #endif//USE_OTA
     // API: Reset ESP
     server.on("/reset-esp", HTTP_POST, [](AsyncWebServerRequest *request) {
         request->send(200, "application/json", "{\"status\":\"✅ ESP will reset\"}");
@@ -277,9 +314,9 @@ void WebinterFace::setupWebConfig() {
     // API: Set initial passwords for user, staff, admin
     server.on("/set-initial-passwords", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
     [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-        String body = String((char*)data).substring(0, len);
+        // String body = String((char*)data).substring(0, len);
         DynamicJsonDocument doc(512);
-        DeserializationError error = deserializeJson(doc, body);
+        DeserializationError error = deserializeJson(doc, (char*) data);
         if (error) {
             request->send(400, "application/json", "{\"status\":\"fail\",\"error\":\"Invalid JSON\"}");
             return;
@@ -299,15 +336,22 @@ void WebinterFace::setupWebConfig() {
         } else {
             request->send(500, "application/json", "{\"status\":\"fail\",\"error\":\"Failed to save passwords\"}");
         }
+        doc.clear();
     });
     // Ethernet Settings API
     server.on("/load-ethernet-config", HTTP_GET, [](AsyncWebServerRequest *request) {
         if (LittleFS.exists(ETHERNET_FILE)) {
             File file = LittleFS.open(ETHERNET_FILE, "r");
             if (file) {
-                String json = file.readString();
+                AsyncWebServerResponse *response = request->beginResponse("application/json", file.size(),
+                    [file](uint8_t *buffer, size_t maxLen, size_t alreadySent) mutable -> size_t {
+                        file.seek(alreadySent, SeekSet);
+                        return file.read(buffer, maxLen);
+                    }
+                );
+                response->addHeader("Content-Type", "application/json");
+                request->send(response);
                 file.close();
-                request->send(200, "application/json", json);
             } else {
                 request->send(500, "application/json", "{\"error\":\"❌ Failed to open ethernet.json\"}");
             }
@@ -318,31 +362,16 @@ void WebinterFace::setupWebConfig() {
 
     server.on("/save-ethernet-config", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
     [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-        String body = String((char*)data).substring(0, len);
-        DynamicJsonDocument doc(512);
-
-        DeserializationError error = deserializeJson(doc, body);
-        if (error) {
-            request->send(400, "application/json", "{\"error\":\"❌ Invalid JSON\"}");
-            return;
-        }
-
-        // Optionally validate fields: dhcpEnable, ip, subnet, gateway, dns
-        bool dhcpEnable = doc["dhcp"] | true;
-        String ip = doc["ip"] | "";
-        String subnet = doc["subnet"] | "";
-        String gateway = doc["gateway"] | "";
-        String dns = doc["dns"] | "";
-
-        // Save to file
-        File configFile = LittleFS.open(ETHERNET_FILE, "w");
+        File configFile = LittleFS.open(ETHERNET_FILE, index == 0 ? "w" : "a");
         if (!configFile) {
             request->send(500, "application/json", "{\"error\":\"❌ Failed to save configuration\"}");
             return;
         }
-        serializeJson(doc, configFile);
+        configFile.write(data, len);
         configFile.close();
-        request->send(200, "application/json", "{\"status\":\"✅ Configuration saved\"}");
+        if (index + len == total) {
+            request->send(200, "application/json", "{\"status\":\"✅ Configuration saved\"}");
+        }
     });
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////// Oin Mapping //////////////////////////////////////////////////
@@ -351,52 +380,45 @@ void WebinterFace::setupWebConfig() {
 // save-data-viewer
     server.on("/save-data-viewer", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
     [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-        String body = String((char*)data).substring(0, len);
-        DynamicJsonDocument doc(1024);
-
-        DeserializationError error = deserializeJson(doc, body);
-        if (error) {
-            request->send(400, "application/json", "{\"error\":\"❌ Invalid JSON\"}");
-            return;
-        }
-
-        // Save the configuration to data-mapping.json
-        File configFile = LittleFS.open(DATA_VIEWER_FILE, "w");
+        // Ghi trực tiếp dữ liệu nhận được vào file mà không cần dùng bộ nhớ đệm động
+        File configFile = LittleFS.open(DATA_VIEWER_FILE, index == 0 ? "w" : "a");
         if (!configFile) {
             request->send(500, "application/json", "{\"error\":\"❌ Failed to save configuration\"}");
             return;
         }
-
-        serializeJson(doc, configFile);
+        configFile.write(data, len);
         configFile.close();
-        request->send(200, "application/json", "{\"status\":\"✅ Configuration saved\"}");
+        if (index + len == total) {
+            request->send(200, "application/json", "{\"status\":\"✅ Configuration saved\"}");
+        }
     });
     //load-data-viewer
     server.on("/load-data-viewer", HTTP_GET, [](AsyncWebServerRequest *request) {
-        if (LittleFS.exists(DATA_VIEWER_FILE)) {
-            // File does not exist, create with default content
-            File file = LittleFS.open("/PinMap.json", "w");
+        if (!LittleFS.exists(DATA_VIEWER_FILE)) {
+            // Nếu file chưa tồn tại, tạo file với nội dung mặc định
+            File file = LittleFS.open(DATA_VIEWER_FILE, "w");
             if (file) {
                 file.print(BoardCustomJson1);
                 file.close();
-            }
-            file = LittleFS.open("/PinMap.json", "r");
-            if (!file) {
-                Serial.println("Failed to create PinMap.json");
-                return;
             }
         }
         if (LittleFS.exists(DATA_VIEWER_FILE)) {
             File file = LittleFS.open(DATA_VIEWER_FILE, "r");
             if (file) {
-                String json = file.readString();
+                AsyncWebServerResponse *response = request->beginResponse("application/json", file.size(),
+                    [file](uint8_t *buffer, size_t maxLen, size_t alreadySent) mutable -> size_t {
+                        file.seek(alreadySent, SeekSet);
+                        return file.read(buffer, maxLen);
+                    }
+                );
+                response->addHeader("Content-Type", "application/json");
+                request->send(response);
                 file.close();
-                request->send(200, "application/json", json);
             } else {
-                request->send(500, "application/json", "{\"error\":\"❌ Failed to open data-mapping.json\"}");
+                request->send(500, "application/json", "{\"error\":\"❌ Failed to open data-viewer.json\"}");
             }
         } else {
-            request->send(404, "application/json", "{\"error\":\"❌ data-mapping.json not found\"}");
+            request->send(404, "application/json", "{\"error\":\"❌ data-viewer.json not found\"}");
         }
     });
 //////////////////////////////////////////////////////////////////
@@ -413,39 +435,38 @@ void WebinterFace::setupWebConfig() {
         if (LittleFS.exists(DATA_MAPPING_FILE)) {
             File file = LittleFS.open(DATA_MAPPING_FILE, "r");
             if (file) {
-                String json = file.readString();
+                // Stream file content instead of loading into memory
+                file.seek(0, SeekSet);
+                AsyncWebServerResponse *response = request->beginResponse("application/json", file.size(), 
+                    [file](uint8_t *buffer, size_t maxLen, size_t alreadySent) mutable -> size_t {
+                        file.seek(alreadySent, SeekSet);
+                        return file.read(buffer, maxLen);
+                    }
+                );
+                response->addHeader("Content-Type", "application/json");
+                request->send(response);
                 file.close();
-                request->send(200, "application/json", json);
             } else {
                 request->send(500, "application/json", "{\"error\":\"❌ Failed to open data-mapping.json\"}");
             }
         } else {
             request->send(404, "application/json", "{\"error\":\"❌ data-mapping.json not found\"}");
         }
-        WebConnected = true;
     });
 
     server.on("/save-data-mapping", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
     [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-        String body = String((char*)data).substring(0, len);
-        DynamicJsonDocument doc(1024);
-
-        DeserializationError error = deserializeJson(doc, body);
-        if (error) {
-            request->send(400, "application/json", "{\"error\":\"❌ Invalid JSON\"}");
-            return;
-        }
-
-        // Save the configuration to data-mapping.json
-        File configFile = LittleFS.open(DATA_MAPPING_FILE, "w");
+        // Ghi trực tiếp dữ liệu nhận được vào file mà không cần dùng bộ nhớ đệm động
+        File configFile = LittleFS.open(DATA_MAPPING_FILE, index == 0 ? "w" : "a");
         if (!configFile) {
             request->send(500, "application/json", "{\"error\":\"❌ Failed to save configuration\"}");
             return;
         }
-
-        serializeJson(doc, configFile);
+        configFile.write(data, len);
         configFile.close();
-        request->send(200, "application/json", "{\"status\":\"✅ Configuration saved\"}");
+        if (index + len == total) {
+            request->send(200, "application/json", "{\"status\":\"✅ Configuration saved\"}");
+        }
     });
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////// LoRa netwwork //////////////////////////////////////////////////
@@ -456,10 +477,10 @@ void WebinterFace::setupWebConfig() {
 // Endpoint: Configure LoRa module
 server.on("/configure-lora", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
 [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-    String body = String((char*)data).substring(0, len);
+    // String body = String((char*)data).substring(0, len);
     DynamicJsonDocument doc(1024);
 
-    DeserializationError error = deserializeJson(doc, body);
+    DeserializationError error = deserializeJson(doc,(char*) data);
     if (error) {
         request->send(400, "application/json", "{\"error\":\"❌ Invalid JSON\"}");
         return;
@@ -479,6 +500,7 @@ server.on("/configure-lora", HTTP_POST, [](AsyncWebServerRequest *request) {}, N
     configLoRa.configureLoRaModule(address, networkID, power, frequency, spreadingFactor, bandwidth, codingRate, preamble);
 
     request->send(200, "application/json", "{\"status\":\"✅ LoRa configuration applied\"}");
+    doc.clear();
 });
 
 
@@ -491,25 +513,35 @@ server.on("/load-lora-config", HTTP_GET, [](AsyncWebServerRequest *request) {
 });
     // configureE32(String json)
     // Endpoint: Configure E32 with JSON
-    server.on("/configure-e32", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
+server.on("/configure-e32", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
     [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-        String body = String((char*)data).substring(0, len);
-        DynamicJsonDocument doc(1024);
-
-        DeserializationError error = deserializeJson(doc, body);
-        if (error) {
-            request->send(400, "application/json", "{\"error\":\"❌ Invalid JSON\"}");
-            return;
+        // Ghi dữ liệu nhận được vào file tạm (hoặc dùng file đích luôn)
+        static File configFile;
+        if (index == 0) {
+            if (configFile) configFile.close();
+            configFile = LittleFS.open("/e32_config.json", "w");
+            if (!configFile) {
+                request->send(500, "application/json", "{\"error\":\"❌ Failed to open file\"}");
+                return;
+            }
         }
-
-        // Convert JSON document to string
-        String jsonConfig;
-        serializeJson(doc, jsonConfig);
-
-        // Call the configureE32 function with the JSON string
-        // configLoRa.configureE32(jsonConfig);
-
-        request->send(200, "application/json", "{\"status\":\"✅ Configuration applied\"}");
+        if (configFile) configFile.write(data, len);
+        if (index + len == total && configFile) {
+            configFile.close();
+            // Đọc lại file và truyền chuỗi JSON trực tiếp mà không dùng bộ nhớ đệm động
+            File file = LittleFS.open("/e32_config.json", "r");
+            if (file) {
+                String jsonConfig;
+                while (file.available()) {
+                    jsonConfig += (char)file.read();
+                }
+                file.close();
+                // configLoRa.configureE32(jsonConfig); // Gọi hàm cấu hình với chuỗi JSON
+                request->send(200, "application/json", "{\"status\":\"✅ Configuration applied\"}");
+            } else {
+                request->send(500, "application/json", "{\"error\":\"❌ Failed to read config file\"}");
+            }
+        }
     });
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////// Mesh netwwork //////////////////////////////////////////////////
@@ -521,9 +553,12 @@ server.on("/load-mesh-config", HTTP_GET, [](AsyncWebServerRequest *request) {
     if (LittleFS.exists(CONFIG_FILE)) {
         File file = LittleFS.open(CONFIG_FILE, "r");
         if (file) {
-            String json = file.readString();
+            const size_t bufferSize = 2048; // Điều chỉnh kích thước nếu cần
+            char buffer[bufferSize];
+            size_t bytesRead = file.readBytes(buffer, bufferSize - 1);
+            buffer[bytesRead] = '\0';
             file.close();
-            request->send(200, "application/json", json);
+            request->send(200, "application/json", buffer);
         } else {
             request->send(500, "application/json", "{\"error\":\"❌ Failed to open mesh.json\"}");
         }
@@ -535,25 +570,17 @@ server.on("/load-mesh-config", HTTP_GET, [](AsyncWebServerRequest *request) {
 // Endpoint: Save Mesh configuration to file
 server.on("/save-mesh-config", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
 [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-    String body = String((char*)data).substring(0, len);
-    DynamicJsonDocument doc(1024);
-
-    DeserializationError error = deserializeJson(doc, body);
-    if (error) {
-        request->send(400, "application/json", "{\"error\":\"❌ Invalid JSON\"}");
-        return;
-    }
-
-    // Save the configuration to mesh.json
-    File configFile = LittleFS.open(CONFIG_FILE, "w");
+    // Ghi trực tiếp dữ liệu nhận được vào file mà không cần dùng bộ nhớ đệm động
+    File configFile = LittleFS.open(CONFIG_FILE, index == 0 ? "w" : "a");
     if (!configFile) {
         request->send(500, "application/json", "{\"error\":\"❌ Failed to save configuration\"}");
         return;
     }
-
-    serializeJson(doc, configFile);
+    configFile.write(data, len);
     configFile.close();
-    request->send(200, "application/json", "{\"status\":\"✅ Configuration saved\"}");
+    if (index + len == total) {
+        request->send(200, "application/json", "{\"status\":\"✅ Configuration saved\"}");
+    }
 });
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////// WIFI MQTT //////////////////////////////////////////////////////
@@ -562,9 +589,13 @@ server.on("/load-wifi-mqtt-config", HTTP_GET, [](AsyncWebServerRequest *request)
     if (LittleFS.exists(WIFIMQTT_FILE)) {
         File file = LittleFS.open(WIFIMQTT_FILE, "r");
         if (file) {
-            String json = file.readString();
+            // Đọc file với bộ đệm tĩnh thay vì String động
+            const size_t bufferSize = 2048; // Điều chỉnh kích thước nếu cần
+            char buffer[bufferSize];
+            size_t bytesRead = file.readBytes(buffer, bufferSize - 1);
+            buffer[bytesRead] = '\0';
             file.close();
-            request->send(200, "application/json", json);
+            request->send(200, "application/json", buffer);
         } else {
             request->send(500, "application/json", "{\"error\":\"❌ Failed to open config.json\"}");
         }
@@ -572,12 +603,13 @@ server.on("/load-wifi-mqtt-config", HTTP_GET, [](AsyncWebServerRequest *request)
         request->send(404, "application/json", "{\"error\":\"❌ config.json not found\"}");
     }
 });
+
 server.on("/save-wifi-mqtt-config", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
 [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-    String body = String((char*)data).substring(0, len);
+
     DynamicJsonDocument doc(1024);
 
-    DeserializationError error = deserializeJson(doc, body);
+    DeserializationError error = deserializeJson(doc,(char*) data);
     if (error) {
         request->send(400, "application/json", "{\"error\":\"❌ Invalid JSON\"}");
         return;
@@ -592,19 +624,23 @@ server.on("/save-wifi-mqtt-config", HTTP_POST, [](AsyncWebServerRequest *request
 
     serializeJson(doc, configFile);
     configFile.close();
+    
+    request->send(200, "application/json", "{\"status\":\"✅ Configuration saved\"}");
+    doc.clear();
+    
 #ifdef USE_MQTT
     // Cập nhật cấu hình toàn cục
     mqttEnable = doc["mqttEnable"] | true;
-    mqttHost = doc["mqttHost"] | "broker.hivemq.com";
+    mqttHost = doc["mqttHost"] | "test.mosquitto.org";
     mqttPort = doc["mqttPort"] | 1883;
-    mqttUser = doc["mqttUser"] | "username";
-    mqttPass = doc["mqttPass"] | "password";
+    mqttUser = doc["mqttUser"] | "";
+    mqttPass = doc["mqttPass"] | "";
     wifiMode = doc["wifiMode"] | "STA";
-    ssid = doc["ssid"] | "yourSSID";
-    pass = doc["pass"] | "yourPassword";
+    ssid = doc["ssid"] | "I-Soft";
+    pass = doc["pass"] | "i-soft@2023";
     conId = doc["conId"] | "b8e54d33-b34a-45ab-b76f-62c8a9abc6c4";
-    mqttTopic = doc["mqttTopic"] | "test/topic";
-    mqttTopicSub = doc["mqttTopicSub"] | "test/topic/sub";
+    mqttTopicPub = doc["topicPush"] | "test/topic";
+    mqttTopicSub = doc["topicSub"] | "test/topic/sub";
     mqttKeepAlive = doc["mqttKeepAlive"] | 60;
     mqttCleanSession = doc["mqttCleanSession"] | true;
     mqttQos = doc["mqttQos"] | 0;
@@ -615,7 +651,6 @@ server.on("/save-wifi-mqtt-config", HTTP_POST, [](AsyncWebServerRequest *request
     mqttLwtRetain = doc["mqttLwtRetain"] | false;
     mqttLwtEnabled = doc["mqttLwtEnabled"] | false;
 #endif//USE_MQTT
-    request->send(200, "application/json", "{\"status\":\"✅ Configuration saved\"}");
 });
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////// MODBUS /////////////////////////////////////////////////////////
@@ -625,42 +660,51 @@ server.on("/save-wifi-mqtt-config", HTTP_POST, [](AsyncWebServerRequest *request
         if (LittleFS.exists(MODBUS_FILE)) {
             File file = LittleFS.open(MODBUS_FILE, "r");
             if (file) {
-                String json = file.readString();
+                AsyncWebServerResponse *response = request->beginResponse("application/json", file.size(),
+                    [file](uint8_t *buffer, size_t maxLen, size_t alreadySent) mutable -> size_t {
+                        file.seek(alreadySent, SeekSet);
+                        return file.read(buffer, maxLen);
+                    }
+                );
+                response->addHeader("Content-Type", "application/json");
+                request->send(response);
                 file.close();
-                request->send(200, "application/json", json);
             } else {
                 request->send(500, "application/json", "{\"error\":\"❌ Failed to open modbus.json\"}");
             }
         } else {
             request->send(404, "application/json", "{\"error\":\"❌ modbus.json not found\"}");
         }
+        WebConnected = true;
     });
+
     server.on("/modbus-config", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
     [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-        String body = String((char*)data).substring(0, len); // Chuyển dữ liệu thành chuỗi
-        // Ghi toàn bộ nội dung từ body vào file MODBUS_FILE
-        File configFile = LittleFS.open(MODBUS_FILE, "w");
+        File configFile = LittleFS.open(MODBUS_FILE, index == 0 ? "w" : "a");
         if (!configFile) {
             request->send(500, "application/json", "{\"error\":\"❌ Failed to save configuration\"}");
             return;
         }
-        configFile.print(body);
+        configFile.write(data, len);
         configFile.close();
-        request->send(200, "application/json", "{\"status\":\"✅ Configuration saved\"}");
-        
+        if (index + len == total) {
+            request->send(200, "application/json", "{\"status\":\"✅ Configuration saved\"}");
+        }
     });
+
     // API: Save Modbus Data Block
     server.on("/save-datablocks", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
     [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-        String body = String((char*)data).substring(0, len);
-        File file = LittleFS.open("/ModbusDataBlock.json", "w");
+        File file = LittleFS.open("/ModbusDataBlock.json", index == 0 ? "w" : "a");
         if (!file) {
             request->send(500, "application/json", "{\"error\":\"❌ Failed to save data block\"}");
             return;
         }
-        file.print(body);
+        file.write(data, len);
         file.close();
-        request->send(200, "application/json", "{\"status\":\"✅ Data block saved\"}");
+        if (index + len == total) {
+            request->send(200, "application/json", "{\"status\":\"✅ Data block saved\"}");
+        }
     });
 
     // API: Read Modbus Data Block
@@ -668,67 +712,116 @@ server.on("/save-wifi-mqtt-config", HTTP_POST, [](AsyncWebServerRequest *request
         if (LittleFS.exists("/ModbusDataBlock.json")) {
             File file = LittleFS.open("/ModbusDataBlock.json", "r");
             if (file) {
-                String json = file.readString();
+                AsyncWebServerResponse *response = request->beginResponse("application/json", file.size(),
+                    [file](uint8_t *buffer, size_t maxLen, size_t alreadySent) mutable -> size_t {
+                        file.seek(alreadySent, SeekSet);
+                        return file.read(buffer, maxLen);
+                    }
+                );
+                response->addHeader("Content-Type", "application/json");
+                request->send(response);
                 file.close();
-                request->send(200, "application/json", json);
             } else {
                 request->send(500, "application/json", "{\"error\":\"❌ Failed to open data block\"}");
             }
         } else {
             request->send(404, "application/json", "{\"error\":\"❌ MobusDataBlock.json not found\"}");
         }
+        WebConnected = true;
     });
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////// FILE SYSTEM /////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////    
     // Khởi tạo FileSystem
-    if (!LittleFS.begin()) {
-        Serial.println("❌ Failed to initialize LittleFS");
-        return;
-    }
-    
+
+    // Endpoint: Danh sách tệp
+    // API: List SD card files with size, total used and free space
+    server.on("/list-sd-files", HTTP_GET, [](AsyncWebServerRequest *request) {
+        #ifdef ESP32
+        if (!SD.begin()) {
+            request->send(500, "application/json", "{\"error\":\"❌ SD card not available\"}");
+            return;
+        }
+        #endif
+        char json[4096];
+        size_t pos = 0;
+        pos += snprintf(json + pos, sizeof(json) - pos, "{\"file\":[");
+        bool first = true;
+        uint64_t totalBytes = 0, usedBytes = 0, freeBytes = 0;
+        #ifdef ESP32
+        totalBytes = SD.totalBytes();
+        usedBytes = SD.usedBytes();
+        freeBytes = totalBytes > usedBytes ? totalBytes - usedBytes : 0;
+        File root = SD.open("/");
+        File file = root.openNextFile();
+        while (file) {
+            if (!first) {
+            pos += snprintf(json + pos, sizeof(json) - pos, ",");
+            }
+            pos += snprintf(json + pos, sizeof(json) - pos, "{\"name\":\"%s\",\"size\":%llu}", file.name(), (unsigned long long)file.size());
+            first = false;
+            file = root.openNextFile();
+        }
+        #endif
+        pos += snprintf(json + pos, sizeof(json) - pos, "]");
+        pos += snprintf(json + pos, sizeof(json) - pos, ",\"info\":{\"used_kb\":%llu,\"free_kb\":%llu}}",
+                (unsigned long long)(usedBytes / 1024),
+                (unsigned long long)(freeBytes / 1024));
+        request->send(200, "application/json", json);
+    });
     // Endpoint: Danh sách tệp
     server.on("/list-files", HTTP_GET, [](AsyncWebServerRequest *request) {
-        String json = "[";
+        if (!LittleFS.begin()) {
+            request->send(500, "application/json", "{\"error\":\"❌ File system init fail\"}");
+            return;
+        }
+        // Use static buffer instead of String for JSON response
+        char json[4096];
+        size_t pos = 0;
+        pos += snprintf(json + pos, sizeof(json) - pos, "{\"files\":[");
         bool first = true;
+        size_t totalBytes = LittleFS.totalBytes();
+        size_t usedBytes = LittleFS.usedBytes();
+        size_t freeBytes = totalBytes > usedBytes ? totalBytes - usedBytes : 0;
+
         File root = LittleFS.open("/");
         File file = root.openNextFile();
         while (file) {
+            // Only show files for staff (2) and admin (3)
             if (permissionLevel == 2) { // staff
-                if (String(file.name()) != "/dashboard.html") {
-                    file = root.openNextFile();
-                    continue;
-                }
-            } else if (permissionLevel == 3) { // admin
-                if (!first) json += ",";
-                json += "\"" + String(file.name()) + "\"";
-                first = false;
-                file = root.openNextFile();
-            } else {
+            if (String(file.name()) != "/dashboard.html") {
                 file = root.openNextFile();
                 continue;
             }
-        }
-        json += "]";
-        // Add file size for each file
-        if (permissionLevel == 3) {
+            } else if (permissionLevel == 3) {
+            // show all files
+            } else {
             file = root.openNextFile();
-            while (file) {
-            if (!first) json += ",";
-            json += "{\"name\":\"" + String(file.name()) + "\",\"size\":" + String(file.size()) + "}";
+            continue;
+            }
+            if (!first) pos += snprintf(json + pos, sizeof(json) - pos, ",");
+            pos += snprintf(json + pos, sizeof(json) - pos,
+                    "{\"name\":\"%s\",\"size\":%llu}", file.name(), (unsigned long long)file.size());
             first = false;
             file = root.openNextFile();
-            }
         }
-        json += ",{\"used_kb\":" + String(LittleFS.usedBytes() / 1024) +
-            ",\"free_kb\":" + String((LittleFS.totalBytes() - LittleFS.usedBytes()) / 1024) + "}";
+        pos += snprintf(json + pos, sizeof(json) - pos, "]");
+        pos += snprintf(json + pos, sizeof(json) - pos,
+                ",\"info\":{\"used_kb\":%llu,\"free_kb\":%llu,\"total_kb\":%llu}}",
+                (unsigned long long)(usedBytes / 1024),
+                (unsigned long long)(freeBytes / 1024),
+                (unsigned long long)(totalBytes / 1024));
         request->send(200, "application/json", json);
+        WebConnected = true;
     });
 
     // Endpoint: Tải lên tệp
     server.on("/upload", HTTP_POST, [](AsyncWebServerRequest *request) {},
         [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+
+            Serial.print("index:" + String(index));
+
             if (!index) {
                 Serial.printf("Uploading file: %s\n", filename.c_str());
                 File file = LittleFS.open("/" + filename, "w");
@@ -741,14 +834,76 @@ server.on("/save-wifi-mqtt-config", HTTP_POST, [](AsyncWebServerRequest *request
             File file = LittleFS.open("/" + filename, "a");
             if (file) {
                 file.write(data, len);
-                file.close();
+                // Gửi % file đang ghi lên socket
+                float percent = 0;
+                if (request->contentLength() > 0) {
+                    percent = ((float)(index + len) / (float)request->contentLength()) * 100.0f;
+                }
+                DynamicJsonDocument doc(128);
+                doc["upload"] = "progress";
+                doc["filename"] = filename;
+                doc["percent"] = (int)percent;
+                String msg;
+                serializeJson(doc, msg);
+                ws.textAll(msg);
+                doc.clear();
             }
             if (final) {
+                file.close();
                 Serial.printf("📤✅ File upload complete: %s\n", filename.c_str());
                 request->send(200, "text/plain", "File uploaded");
             }
         });
-
+    // Endpoint: Tải lên tệp
+    server.on("/upload-sd", HTTP_POST, [](AsyncWebServerRequest *request) {},
+        [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+            if (!index) {
+                Serial.printf("Uploading file: %s\n", filename.c_str());
+                File file = SD.open("/" + filename, "w");
+                if (!file) {
+                    Serial.println("❌ [SD] Failed to open file for writing");
+                    return;
+                }
+                file.close();
+            }
+            File file = SD.open("/" + filename, "a");
+            if (file) {
+                file.write(data, len);
+                // Gửi tiến trình upload qua websocket
+                float percent = 0;
+                if (request->contentLength() > 0) {
+                    percent = ((float)(index + len) / (float)request->contentLength()) * 100.0f;
+                }
+                DynamicJsonDocument doc(128);
+                doc["upload"] = "progress";
+                doc["filename"] = filename;
+                doc["percent"] = (int)percent;
+                String msg;
+                serializeJson(doc, msg);
+                ws.textAll(msg);
+                doc.clear();
+            }
+            if (final) {
+                file.close();
+                Serial.printf("📤✅ File upload SD card complete: %s\n", filename.c_str());
+                request->send(200, "text/plain", "File uploaded");
+            }
+        });
+    
+    // Endpoint: Xóa tệp
+    server.on("/delete-sd", HTTP_DELETE, [](AsyncWebServerRequest *request) {
+        if (request->hasParam("file")) {
+            String fileName = request->getParam("file")->value();
+            Serial.println("> delete file " + fileName);
+            if (SD.remove("/" + fileName)) {
+                request->send(200, "text/plain", "🗑️ File deleted on SD ✅");
+            } else {
+                request->send(500, "text/plain", "❌ Failed to delete file on SD");
+            }
+        } else {
+            request->send(400, "text/plain", "❌ File parameter missing on SD");
+        }
+    });
     // Endpoint: Xóa tệp
     server.on("/delete", HTTP_DELETE, [](AsyncWebServerRequest *request) {
         if (request->hasParam("file")) {
@@ -807,18 +962,29 @@ server.on("/save-wifi-mqtt-config", HTTP_POST, [](AsyncWebServerRequest *request
         request->send(response);
     });
     server.on("/index.html", HTTP_GET, [](AsyncWebServerRequest *request){
-        if(permissionLevel < 3 && permissionLevel > 0){
+        if(permissionLevel <= 0){
             request->send(403, "text/plain", "❌ Access Denied");
             return;
         }
-        if(permissionLevel == 3){
+        if  (permissionLevel == 3 ){
             request->send(LittleFS, "/index.html", String(), false, processors);
+        } else if( permissionLevel == 1 || permissionLevel == 2 ) {
+            request->send(LittleFS, "/dashboard.html", String(), false, processors);
         }
         // connectClinent = true;
       });
+    server.on("/dashboard.html", HTTP_GET, [](AsyncWebServerRequest *request){
+        if(permissionLevel <= 0){
+            request->send(403, "text/plain", "❌ Access Denied");
+            return;
+        }
+        if( permissionLevel == 1 || permissionLevel == 2 ) {
+            request->send(LittleFS, "/dashboard.html", String(), false, processors);
+        }
+    });
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
         // request->send(LittleFS, "/index.html", String(), false, processors);
-        if (permissionLevel == 0) {
+        if ( permissionLevel == 0 ) {
             // Serve login page with WebSocket
             // Check if any certification file is missing
             if (!LittleFS.exists("/certification1.bin") ||
@@ -942,9 +1108,9 @@ server.on("/save-wifi-mqtt-config", HTTP_POST, [](AsyncWebServerRequest *request
             )rawliteral");
             request->send(response);
         }
-        if (permissionLevel == 3) {
+        if ( permissionLevel == 3 ) {
             request->send(LittleFS, "/index.html", String(), false, processors);
-        }else {
+        }else if( permissionLevel == 1 || permissionLevel == 2 ) {
             request->send(LittleFS, "/dashboard.html", String(), false, processors);
         }
         // connectClinent = true;

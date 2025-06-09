@@ -1,172 +1,19 @@
 #include "TskMQTT.h"
 #include "WebInterface.h"
 WebinterFace webInterface;
+// #define ESP32SC
+// #ifdef ESP32SC
+// #include <WebServer_ESP32_SC_W5500.h>
+// #else
+// #include <WebServer_ESP32_W5500.h>
+// #endif// ESP32
+
 #define MQTT_Client
 #ifdef MQTT_Client
 AsyncMqttClient mqttClient;
 TimerHandle_t mqttReconnectTimer;
 TimerHandle_t wifiReconnectTimer;
 #endif//MQTT_Client
-#ifdef MQTTV1
-WiFiClientSecure net;
-MQTTClient mqttClient;
-void messageReceived(String &topic, String &payload) {
-    Serial.println("incoming: " + topic + " - " + payload);
-  
-    // Note: Do not use the client in the callback to publish, subscribe or
-    // unsubscribe as it may cause deadlocks when other things arrive while
-    // sending and receiving acknowledgments. Instead, change a global variable,
-    // or push to a queue and handle it in the loop after calling `client.loop()`.
-  }
-void setupMQTT() {
-    // net.setInsecure();
-
-    mqttClient.begin(mqttHost.c_str(), mqttPort, net);
-    if (!mqttClient.connected()) {
-        if (mqttClient.connect(conId.c_str(), mqttUser.c_str(), mqttPass.c_str())) {
-            Serial.println("MQTT connected.");
-            mqttClient.onMessage(messageReceived);
-            mqttClient.subscribe(mqttTopicSub.c_str());
-        } else {
-            Serial.println("MQTT connection failed.");
-        }
-    }
-}
-static int counter = 0;
-void WifiMqttConfig::setupWiFi() {
-    static int reconnectAttempts = 0; // Biến đếm số lần thử kết nối lại
-
-    if (wifiMode == "STA") {
-        WiFi.mode(WIFI_STA);
-        WiFi.begin(ssid.c_str(), pass.c_str());
-        Serial.print("Connecting to WiFi");
-        while (WiFi.status() != WL_CONNECTED) {
-            static int counter = 0;
-            if (counter++ < 20) {
-                Serial.print(".");
-                delay(500); // Thêm delay để tránh vòng lặp quá nhanh
-            } else {
-                Serial.println("Connect to WiFi fail.");
-                reconnectAttempts++;
-                break;
-            }
-        }
-
-        if (WiFi.status() == WL_CONNECTED) {
-            Serial.println("WiFi connected.");
-            Serial.print("IP address: ");
-            Serial.println(WiFi.localIP());
-            reconnectAttempts = 0; // Reset số lần thử khi kết nối thành công
-            webInterface.setupWebConfig();
-        } else if (reconnectAttempts >= 3) {
-            Serial.println("Failed to connect to WiFi after 3 attempts. Switching to AP mode.");
-            // Cập nhật cấu hình sang chế độ AP
-            wifiMode = "AP";
-            DynamicJsonDocument doc(1024);
-            doc["mqttEnable"] = mqttEnable;
-            doc["mqttHost"] = mqttHost;
-            doc["mqttPort"] = mqttPort;
-            doc["mqttUser"] = mqttUser;
-            doc["mqttPass"] = mqttPass;
-            doc["wifiMode"] = wifiMode; // Lưu chế độ WiFi (STA hoặc AP)
-            doc["ssid"] = ssid;
-            doc["pass"] = pass;
-            doc["conId"] = conId;
-            doc["mqttTopic"] = mqttTopic;
-            doc["mqttTopicSub"] = mqttTopicSub;
-        
-            File configFile = LittleFS.open(WIFIMQTT_FILE, "w");
-            if (!configFile) {
-                Serial.println("Failed to open config file for writing.");
-                return;
-            }
-            serializeJson(doc, configFile);
-            configFile.close();
-            
-        }
-    }else {
-        mqttEnable = false;
-    }
-}
-void WifiMqttConfig::setup() {
-
-    if (!LittleFS.begin()) {
-        Serial.println("Failed to initialize LittleFS");
-        return;
-    }
-
-    // Tải cấu hình từ file
-    if (LittleFS.exists(WIFIMQTT_FILE)) {
-        File configFile = LittleFS.open(WIFIMQTT_FILE, "r");
-        if (configFile) {
-            DynamicJsonDocument doc(1024);
-            deserializeJson(doc, configFile);
-            configFile.close();
-
-            mqttEnable = doc["mqttEnable"] | true;
-            mqttHost = doc["mqttHost"] | "broker.hivemq.com";
-            mqttPort = doc["mqttPort"] | 1883;
-            mqttUser = doc["mqttUser"] | "username";
-            mqttPass = doc["mqttPass"] | "password";
-            wifiMode = doc["wifiMode"] | "STA";
-            ssid = doc["ssid"] | "I-Soft";
-            pass = doc["pass"] | "i-soft@2023";
-            conId = doc["conId"] | "b8e54d33-b34a-45ab-b76f-62c8a9abc6c4";
-            mqttTopic = doc["mqttTopic"] | "test/topic";
-            mqttTopicSub = doc["mqttTopicSub"] | "test/topic/sub";
-        }
-    }
-    if(mqttEnable){
-        Serial.println("SSID: " + ssid);
-        Serial.println("Password: " + pass);
-        Serial.println("WiFi Mode: " + wifiMode);
-        Serial.println("MQTT enabled.");
-        Serial.print("MQTT Host: ");
-        Serial.println(mqttHost);
-        Serial.print("MQTT Port: ");
-        Serial.println(mqttPort);
-        Serial.print("MQTT User: ");
-        Serial.println(mqttUser);
-        Serial.print("MQTT Password: ");
-        Serial.println(mqttPass);
-        Serial.println("ConId: " + conId);
-        Serial.print("MQTT Topic: ");
-        Serial.println(mqttTopic);
-        Serial.print("MQTT Topic Sub: ");
-        Serial.println(mqttTopicSub);
-    
-        setupWiFi();
-        if (mqttEnable) {
-            setupMQTT();
-        }
-    }
-
-    // server.begin();
-    // Serial.println("Web server started.");
-}
-
-void WifiMqttConfig::loop() {
-    if (mqttEnable) {
-        static long lastTimeConnect = 0;
-        if (millis() - lastTimeConnect > 10000) {
-            lastTimeConnect = millis();
-            Serial.println("MQTT loop.");
-            if(WiFi.status() != WL_CONNECTED) {
-                Serial.println("WiFi not connected, trying to reconnect...");
-                setupWiFi();
-                }
-                else{
-                    mqttClient.loop();
-                    if (!mqttClient.connected()) {
-                        setupMQTT();
-                    }
-                }
-            }
-    }
-    
-    // server.handleClient();
-}
-#endif// MQTT_V1
 
 // bool mqttIsConnected = false;
 
@@ -203,8 +50,8 @@ String WifiMqttConfig::loadWifiMqttConfig(bool debug, fs::FS &FileSystem) {
         doc["ssid"] = "I-Soft";
         doc["pass"] = "i-soft@2023";
         doc["conId"] = "b8e54d33-b34a-45ab-b76f-62c8a9abc6c4";
-        doc["mqttTopic"] = "test/topic";
-        doc["mqttTopicSub"] = "test/topic/sub";
+        doc["topicPush"] = "test/topic";
+        doc["topicSub"] = "test/topic/sub";
         doc["mqttKeepAlive"] = 60; // Default Keep Alive
         doc["mqttCleanSession"] = true; // Default Clean Session
         doc["mqttQos"] = 1; // Default QoS
@@ -278,18 +125,22 @@ void connectToWifi() {
       switch(event) {
       case SYSTEM_EVENT_STA_GOT_IP:
         reconnectAttempts = 0;
-          Serial.println("✅ WiFi connected");
+          Serial.println("✅  WiFi connected");
           Serial.println("IP address: ");
           Serial.println(WiFi.localIP());
-          connectToMqtt();
+            if(wifiMode == "STA" && mqttEnable){
+                connectToMqtt();
+            }
           webInterface.setupWebConfig();
           Serial.print("WiFi Channel: ");
           Serial.println(WiFi.channel());
           xTimerStop(wifiReconnectTimer, 0); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
-          xTimerStart(mqttReconnectTimer, 0);
+            if(wifiMode == "STA" && mqttEnable){
+                xTimerStart(mqttReconnectTimer, 0);
+            }
           break;
       case SYSTEM_EVENT_STA_DISCONNECTED:
-          Serial.println("❌ WiFi lost connection");
+          Serial.println("❌  WiFi lost connection");
           
           xTimerStop(mqttReconnectTimer, 0); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
           xTimerStart(wifiReconnectTimer, 0);
@@ -305,20 +156,7 @@ void connectToWifi() {
         LOGLN("ETH Connected");
         break;
     case SYSTEM_EVENT_ETH_GOT_IP:
-    #ifdef USE_LAN8720
-        Serial.print("ETH MAC: ");
-        Serial.print(ETH.macAddress());
-        Serial.print(", IPv4: ");
-        Serial.print(ETH.localIP());
-        if (ETH.fullDuplex())
-        {
-            Serial.print(", FULL_DUPLEX");
-        }
-        Serial.print(", ");
-        Serial.print(ETH.linkSpeed());
-        LOGLN("Mbps");
-        // eth_connected = true;
-    #endif//USE_LAN8720
+    
         break;
         case SYSTEM_EVENT_ETH_DISCONNECTED:
             LOGLN("ETH Disconnected");
@@ -360,19 +198,131 @@ void connectToWifi() {
   
 #define RTC_Onl
 #include "RTC_Online.h"
+RTCTimeOnline rtcOnline;
+
+  #include "AudioFunc.h"
+  AudioCmd MQTTaudioCmnd;
+
+// Wrapper for AsyncMqttClient onMessage
+void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total) {
+    Serial.println("Publish received.");
+    Serial.print("  topic: ");
+    Serial.println(topic);
+    Serial.print("  qos: ");
+    Serial.println(properties.qos);
+    Serial.print("  dup: ");
+    Serial.println(properties.dup);
+    Serial.print("  retain: ");
+    Serial.println(properties.retain);
+    Serial.print("  len: ");
+    Serial.println(len);
+    Serial.print("  index: ");
+    Serial.println(index);
+    Serial.print("  total: ");
+    Serial.println(total);
+
+    // Remove any trailing non-JSON characters (e.g., stray bytes after the payload)
+    String cleanPayload = String(payload);
+    int jsonEnd = cleanPayload.lastIndexOf('}');
+    if (jsonEnd != -1) {
+        cleanPayload = cleanPayload.substring(0, jsonEnd + 1);
+    }
+    JSONVar inputPro = JSON.parse(cleanPayload.c_str()); // Parse the input string as JSON
+    // Handle JSON message for LED control
+    // Check if the JSON contains "data" and "light" to control the LED
+    if (inputPro.hasOwnProperty("data")) {
+        bool lightValue = (bool)inputPro["data"]["light"];
+        Serial.print("Light value received: ");
+        Serial.println(lightValue);
+        if (lightValue) {
+            Serial.println("Turning on LED.");
+            digitalWrite(15, HIGH); // Turn on the LED
+        } else {
+            Serial.println("Turning off LED.");
+            digitalWrite(15, LOW); // Turn off the LED
+        }
+    }
+    MQTTaudioCmnd.audioCmnd(payload);
+
+    // Forward message as before
+    mqttClient.publish(mqttTopicPub.c_str(), mqttQos, mqttRetain, payload);    // Parse JSON
+
+}
+  void onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
+    Serial.println("Disconnected from MQTT.");
+    mqttIsConnected = false;
+    if (WiFi.isConnected()) {
+      xTimerStart(mqttReconnectTimer, 0);
+    }
+  }
+  
+  void onMqttSubscribe(uint16_t packetId, uint8_t qos) {
+    Serial.println("Subscribe acknowledged.");
+    Serial.print("  packetId: ");
+    Serial.println(packetId);
+    Serial.print("  qos: ");
+    Serial.println(qos);
+  }
+  
+  void onMqttUnsubscribe(uint16_t packetId) {
+    Serial.println("Unsubscribe acknowledged.");
+    Serial.print("  packetId: ");
+    Serial.println(packetId);
+  }
+//   void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total) {
+//     Serial.println("Publish received.");
+//     Serial.print("  topic: ");
+//     Serial.println(topic);
+//     Serial.print("  qos: ");
+//     Serial.println(properties.qos);
+//     Serial.print("  dup: ");
+//     Serial.println(properties.dup);
+//     Serial.print("  retain: ");
+//     Serial.println(properties.retain);
+//     Serial.print("  len: ");
+//     Serial.println(len);
+//     Serial.print("  index: ");
+//     Serial.println(index);
+//     Serial.print("  total: ");
+//     Serial.println(total);
+//     // MQTTaudioCmnd.audioCmnd(payload);
+//     mqttClient.publish(mqttTopicPub.c_str(), mqttQos, mqttRetain, payload);
+//   }
+  
+  void onMqttPublish(uint16_t packetId) {
+    Serial.println("Publish acknowledged.");
+    Serial.print("  packetId: ");
+    Serial.println(packetId);
+  }
+
   void onMqttConnect(bool sessionPresent) {
+        mqttClient.onDisconnect(onMqttDisconnect);
+        mqttClient.onSubscribe(onMqttSubscribe);
+        mqttClient.onUnsubscribe(onMqttUnsubscribe);
+        mqttClient.onMessage(onMqttMessage);
+        mqttClient.onPublish(onMqttPublish);
     Serial.println("Connected to MQTT.");
     Serial.print("Session present: ");
     Serial.println(sessionPresent);
     uint16_t packetIdSub = mqttClient.subscribe(mqttTopicSub.c_str() , mqttQos);
+    Serial.print("Subscribed to topic: ");
+    Serial.println(mqttTopicSub);
     Serial.print("Subscribing at QoS " + String(mqttQos) + ", packetId: ");
     Serial.println(packetIdSub);
+    Serial.print("Publishing to topic: ");
+    Serial.println(mqttTopicPub);
     // mqttClient.publish("test/lol", 0, true, "test 1");
     // Serial.println("Publishing at QoS 0");
-    String TimeAt = String(Getyear) + "-" + String(Getmonth) + "-" + String(Getday) + " " + String(Gethour) + ":" + String(Getmin) + ":" + String(Getsec);
-    String payload = "Node Start at: " + TimeAt + " with IP: " + String(WiFi.localIP().toString());
-    String TopicStart = mqttTopicStat + "/Node19";
-    uint16_t packetIdPub1 = mqttClient.publish(TopicStart.c_str(), 1, true, payload.c_str());payload.clear();TimeAt.clear();
+    // Get current time
+    rtcOnline.GetTime();
+    char TimeAt[32];
+    snprintf(TimeAt, sizeof(TimeAt), "%04d-%02d-%02d %02d:%02d:%02d", Getyear, Getmonth, Getday, Gethour, Getmin, Getsec);
+
+    char payload[128];
+    snprintf(payload, sizeof(payload), "Node Start at: %s with IP: %s", TimeAt, WiFi.localIP().toString().c_str());
+    char TopicStart[128];
+    snprintf(TopicStart, sizeof(TopicStart), "%s/Node19", mqttTopicStat.c_str());
+    uint16_t packetIdPub1 = mqttClient.publish(TopicStart, 1, true, payload);
     Serial.print("Publishing at QoS " + String(mqttQos) + ", packetId: ");
     Serial.println(packetIdPub1);
     // Set Last Will and Testament (LWT) if enabled
@@ -402,53 +352,12 @@ void connectToWifi() {
     xTimerStop(mqttReconnectTimer, 0);
   }
   
-  void onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
-    Serial.println("Disconnected from MQTT.");
-    mqttIsConnected = false;
-    if (WiFi.isConnected()) {
-      xTimerStart(mqttReconnectTimer, 0);
-    }
-  }
-  
-  void onMqttSubscribe(uint16_t packetId, uint8_t qos) {
-    Serial.println("Subscribe acknowledged.");
-    Serial.print("  packetId: ");
-    Serial.println(packetId);
-    Serial.print("  qos: ");
-    Serial.println(qos);
-  }
-  
-  void onMqttUnsubscribe(uint16_t packetId) {
-    Serial.println("Unsubscribe acknowledged.");
-    Serial.print("  packetId: ");
-    Serial.println(packetId);
-  }
-  
-  void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total) {
-    Serial.println("Publish received.");
-    Serial.print("  topic: ");
-    Serial.println(topic);
-    Serial.print("  qos: ");
-    Serial.println(properties.qos);
-    Serial.print("  dup: ");
-    Serial.println(properties.dup);
-    Serial.print("  retain: ");
-    Serial.println(properties.retain);
-    Serial.print("  len: ");
-    Serial.println(len);
-    Serial.print("  index: ");
-    Serial.println(index);
-    Serial.print("  total: ");
-    Serial.println(total);
-  }
-  
-  void onMqttPublish(uint16_t packetId) {
-    Serial.println("Publish acknowledged.");
-    Serial.print("  packetId: ");
-    Serial.println(packetId);
-  }
+
   
   void WifiMqttConfig::setup() {
+    pinMode(15, OUTPUT); // Set GPIO 15 as output for LED control
+    digitalWrite(15, LOW); // Initialize LED to LOW (off)
+
     if (LittleFS.exists(WIFIMQTT_FILE)) {
         File configFile = LittleFS.open(WIFIMQTT_FILE, "r");
         if (configFile) {
@@ -459,14 +368,14 @@ void connectToWifi() {
             mqttEnable = doc["mqttEnable"] | true;
             mqttHost = doc["mqttHost"] | "broker.hivemq.com";
             mqttPort = doc["mqttPort"] | 1883;
-            mqttUser = doc["mqttUser"] | "username";
-            mqttPass = doc["mqttPass"] | "password";
+            mqttUser = doc["mqttUser"] | "";
+            mqttPass = doc["mqttPass"] | "";
             wifiMode = doc["wifiMode"] | "AP";
             ssid = doc["ssid"] | "I-Soft";
             pass = doc["password"] | "i-soft@2023";
             conId = doc["conId"] | "b8e54d33-b34a-45ab-b76f-62c8a9abc6c4";
-            mqttTopic = doc["mqttTopic"] | "test/topic";
-            mqttTopicSub = doc["mqttTopicSub"] | "test/topic/sub";
+            mqttTopicPub = doc["topicPush"].as<String>();
+            mqttTopicSub = doc["topicSub"].as<String>();
             mqttKeepAlive = doc["mqttKeepAlive"] | 60; // Default Keep Alive
             mqttCleanSession = doc["mqttCleanSession"] | true; // Default Clean Session
             mqttQos = doc["mqttQos"] | 1; // Default QoS
@@ -485,8 +394,8 @@ void connectToWifi() {
         doc["mqttEnable"] = true;
         doc["mqttHost"] = "broker.hivemq.com";
         doc["mqttPort"] = 1883;
-        doc["mqttUser"] = "username";
-        doc["mqttPass"] = "password";
+        doc["mqttUser"] = "";
+        doc["mqttPass"] = "";
         doc["wifiMode"] = "STA";
         doc["ssid"] = "I-Soft";
         doc["password"] = "i-soft@2023";
@@ -527,7 +436,7 @@ void connectToWifi() {
         Serial.println(mqttPass);
         Serial.println("ConId: " + conId);
         Serial.print("MQTT Topic: ");
-        Serial.println(mqttTopic);
+        Serial.println(mqttTopicPub);
         Serial.print("MQTT Topic Sub: ");
         Serial.println(mqttTopicSub);
         Serial.print("MQTT Keep Alive: ");
@@ -557,34 +466,32 @@ void connectToWifi() {
         mqttReconnectTimer = xTimerCreate("mqttTimer", pdMS_TO_TICKS(2000), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToMqtt));
     }
     if(wifiMode == "STA"){
-
         wifiReconnectTimer = xTimerCreate("wifiTimer", pdMS_TO_TICKS(2000), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToWifi));
+        xTimerStart(wifiReconnectTimer, 0);
     }
   
     WiFi.onEvent(WiFiEvent);
     if(wifiMode == "STA" && mqttEnable){
+
         mqttClient.onConnect(onMqttConnect);
-        mqttClient.onDisconnect(onMqttDisconnect);
-        mqttClient.onSubscribe(onMqttSubscribe);
-        mqttClient.onUnsubscribe(onMqttUnsubscribe);
-        mqttClient.onMessage(onMqttMessage);
-        mqttClient.onPublish(onMqttPublish);
         mqttClient.setServer(mqttHost.c_str(), mqttPort);
         mqttClient.setCredentials(mqttUser.c_str(), mqttPass.c_str());
+        connectToWifi();
+    }
+    if(wifiMode == "STA"){
         connectToWifi();
     }
   }
 bool once2 = true;
   void WifiMqttConfig::loop(){
     if(once2){once2 = false;Serial.println("MQTT loop.");}
-    // if (WiFi.status() != WL_CONNECTED && wifiMode == "STA" && mqttEnable) {
-    //     static unsigned long lastAttemptTime = 0;
-    //     if (millis() - lastAttemptTime > 2000) { // Delay 2000ms between connection attempts
-    //         lastAttemptTime = millis();
-    //         connectToWifi();
-    //     }
-    // }
-    if (reconnectAttempts >= 10) {
+    if (WiFi.status() != WL_CONNECTED && mqttEnable) {
+        static unsigned long lastAttemptTime = 0;
+        if (millis() - lastAttemptTime > 5000) { // Delay 2000ms between connection attempts
+            lastAttemptTime = millis();
+        }
+    }
+    if (reconnectAttempts >= 20) {
         Serial.println("Failed to connect to Wi-Fi after 3 attempts. Switching to AP mode.");
         // Cập nhật cấu hình sang chế độ AP
         wifiMode = "AP";
@@ -598,8 +505,8 @@ bool once2 = true;
         doc["ssid"] = ssid;
         doc["password"] = pass;
         doc["conId"] = conId;
-        doc["mqttTopic"] = mqttTopic;
-        doc["mqttTopicSub"] = mqttTopicSub;
+        doc["topicPush"] = mqttTopicPub;
+        doc["topicSub"] = mqttTopicSub;
     
         File configFile = LittleFS.open(WIFIMQTT_FILE, "w");
         if (!configFile) {

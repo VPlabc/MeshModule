@@ -152,3 +152,15 @@ list các thông số
   "fec": true,
   "power": 30
 }
+
+
+
+{"cmd":"speech","text":"có xe đang vào slot Loading bảng số 60F190.00", "voice":"vi"}
+{"cmd":"speech","text":"có xe đang vào slot. bảng số 60F190.00", "voice":"vi"}
+
+{"cmd":"volume","level":6}
+
+{"cmd":"stop"}
+
+
+{   "cmd": "playurl",   "url": "http://stream2.dancewave.online:8080/dance.ogg" }

@@ -1,0 +1,64 @@
+{
+    {
+        {"name":"DataMapping.json","size":2},
+        {"name":"Ethernet.json","size":87},
+        {"name":"ModbusDataBlock.json","size":78},
+        {"name":"PinMap.json","size":494},
+        {"name":"certification1.bin","size":4},
+        {"name":"certification2.bin","size":5},
+        {"name":"certification3.bin","size":9},
+        {"name":"config.json","size":243},
+        {"name":"index.html.gz","size":31229},
+        {"name":"modbus.json","size":130},
+        {"name":"wifi_mqtt.json","size":447}
+    },
+    {"used_kb":40,"free_kb":856}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+{
+    "cmnd":"upload","Name":"/folder2","size":56,"type":"file"
+}
+
+{
+    "cmnd":"delete","Name":"/","type":"file"
+}
+
+{
+    "cmnd":"download","Name":"/","type":"file"
+}
+
+{
+    "cmnd":"list","Name":"/"
+}
+

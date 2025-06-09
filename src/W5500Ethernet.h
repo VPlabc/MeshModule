@@ -1,11 +1,14 @@
 #include <Arduino.h>
+#define ESP32SC
 
 #define DEBUG_ETHERNET_WEBSERVER_PORT       Serial
 // Debug Level from 0 to 4
 #define _ETHERNET_WEBSERVER_LOGLEVEL_       3
-
+#ifdef ESP32SC
+#include <WebServer_ESP32_SC_W5500.h>
+#else
 #include <WebServer_ESP32_W5500.h>
-
+#endif// ESP32
 // WebServer server(80);
 
 // Enter a MAC address and IP address for your controller below.
@@ -53,8 +56,8 @@ void W5500setup(int CS_GP,int INT_GP, int SCK_GP, int MISO_GP, int MOSI_GP)
   Serial.print(F("\nStart MQTTClient_Auth on "));
   Serial.print(ARDUINO_BOARD);
   Serial.print(F(" with "));
-  Serial.println(SHIELD_TYPE);
-  Serial.println(WEBSERVER_ESP32_W5500_VERSION);
+  // Serial.println(SHIELD_TYPE);
+  // Serial.println(WEBSERVER_ESP32_W5500_VERSION);
 
   ET_LOGWARN(F("Default SPI pinout:"));
   ET_LOGWARN1(F("SPI_HOST:"), ETH_SPI_HOST);
@@ -75,10 +78,15 @@ void W5500setup(int CS_GP,int INT_GP, int SCK_GP, int MISO_GP, int MOSI_GP)
   // Use DHCP dynamic IP and random mac
   //bool begin(int MISO_GPIO, int MOSI_GPIO, int SCLK_GPIO, int CS_GPIO, int INT_GPIO, int SPI_CLOCK_MHZ,
   //           int SPI_HOST, uint8_t *W6100_Mac = W6100_Default_Mac);
-  if(W5500ETH.begin( MISO_GP, MOSI_GP, SCK_GP, CS_GP, INT_GP, SPI_CLOCK_MHZ, ETH_SPI_HOST, mac[millis() % NUMBER_OF_MAC] )) {
-    ET_LOG(F("✅ W5500 Ethernet started successfully"));
+  #ifdef ESP32SC
+  if(SCETH.begin( MISO_GP, MOSI_GP, SCK_GP, CS_GP, INT_GP, SPI_CLOCK_MHZ, ETH_SPI_HOST, mac[millis() % NUMBER_OF_MAC] )) 
+  #else
+  if(W5500ETH.begin( MISO_GP, MOSI_GP, SCK_GP, CS_GP, INT_GP, SPI_CLOCK_MHZ, ETH_SPI_HOST, mac[millis() % NUMBER_OF_MAC] )) 
+  #endif//ESP32SC
+  {
+    ET_LOG(F("✅   W5500 Ethernet started successfully"));
   } else {
-    ET_LOGERROR(F("❌ Failed to start W5500 Ethernet!"));
+    ET_LOGERROR(F("❌   Failed to start W5500 Ethernet!"));
     return;
   }
   //ETH.begin( MISO_GPIO, MOSI_GPIO, SCK_GPIO, CS_GPIO, INT_GPIO, SPI_CLOCK_MHZ, ETH_SPI_HOST, mac[millis() % NUMBER_OF_MAC] );
@@ -126,7 +134,11 @@ void W5500setup(int CS_GP,int INT_GP, int SCK_GP, int MISO_GP, int MOSI_GP)
                     bool dhcpEnable = doc["dhcp"];
                     Serial.println("dhcp: " + String(dhcpEnable? "enable":"disable"));
                     if(dhcpEnable){
+                      #ifdef ESP32SC
+                        SCETH.config(myIP, myGW, mySN, myDNS);
+                      #else
                         W5500ETH.config(myIP, myGW, mySN, myDNS);
+                      #endif//ESP32SC
                     }else{
                             // Static IP, leave without this line to get IP via DHCP
                         bool config(IPAddress local_ip, IPAddress gateway, IPAddress subnet, IPAddress dns1, IPAddress dns2 );
@@ -139,7 +151,7 @@ void W5500setup(int CS_GP,int INT_GP, int SCK_GP, int MISO_GP, int MOSI_GP)
     
 
 
-  ESP32_W5500_waitForConnect();
+  // ESP32_W5500_waitForConnect();
   mainwebInterface.setupWebConfig();
   ///////////////////////////////////
 }

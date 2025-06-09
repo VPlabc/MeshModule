@@ -10,9 +10,15 @@
 uint16_t ModbusDataRead[130];//counterIn total 
 bool ModbusCoilRead[130];//counterIn total 
 
-const uint16_t Coil_Y40 = 32;               // Modbus Coil Offset
+uint16_t AddrOffset = 0;
+
+uint16_t RegSpeedAddr = 160;
+
+uint16_t RegSpeed[2];
+
+int16_t Coil_Y40 = 32;               // Modbus Coil Offset
+
 const uint16_t CoilOffset = 0;               // Modbus Coil Offset
-// IPAddress remote(192, 168, 3, 251);  // Address of Modbus Slave device
 
 static uint16_t nCountReadConnected = 0; 
 
@@ -31,6 +37,7 @@ uint16_t holdingRegisters[120];//0-30 PLC Data /30-34 total Plan / 34-74 product
 boolean coils[50];
 
 };
+
 Modbus_TCP_Prog mb_c;
 
 uint16_t HoldRegCall(TRegister* r, uint16_t v) { // Callback function
@@ -41,6 +48,7 @@ uint16_t HoldRegCall(TRegister* r, uint16_t v) { // Callback function
   }
   return v;
 }
+
 uint16_t CoilCall(TRegister* r, uint16_t v) { // Callback function
   if (r->value != v) {  // Check if Coil state is going to be changed
     Serial.print("Read coil reg: ");
@@ -49,7 +57,9 @@ uint16_t CoilCall(TRegister* r, uint16_t v) { // Callback function
   }
   return v;
 }
+
 void TCP_setup(bool role) {
+
   if(role == 0){
   ModBus.client();                    // Initialize local Modbus Client
   ModBus.addCoil(Coil_Y40);           // Add Coil
@@ -57,12 +67,14 @@ void TCP_setup(bool role) {
   }
   if(role == 1){
     ModBus.server();
-    // ModBus.onGetHreg(AddrOffset, HoldRegCall, 50);   
+    ModBus.onGetHreg(AddrOffset, HoldRegCall, 50);   
     ModBus.onGetHreg(CoilOffset, CoilCall, 50);   
   }
 }
+
 byte TCPconnected = 0; 
 byte TCPdisconnected = 0; 
+
 void TCP_loop(bool role,int IPAddr1,int IPAddr2,int IPAddr3,int IPAddr4) {
   if(role == 0){
     IPAddress remote(IPAddr1, IPAddr2, IPAddr3, IPAddr4);
@@ -72,7 +84,7 @@ void TCP_loop(bool role,int IPAddr1,int IPAddr2,int IPAddr3,int IPAddr4) {
 
   //     ModBus.readCoil(remote, Coil_Y40, &RunStop); delay(1);
   //       //-----Speed
-  //     ModBus.readHreg(remote, Speed, (uint16_t *)&SpeedData,2); //Read holdingRegisters
+      ModBus.readHreg(remote, RegSpeedAddr, (uint16_t *)&RegSpeed, 2);delay(1); //Read holdingRegisters
   // //ModBus.
   //   ModBus.readHreg(remote, CounterTotal, (uint16_t *)&CounterData,4);delay(1);
   //   ModBus.readHreg(remote, AddrOffset, (uint16_t *)&ModbusDataRead,50);delay(1);
@@ -91,7 +103,8 @@ void TCP_loop(bool role,int IPAddr1,int IPAddr2,int IPAddr3,int IPAddr4) {
       if(TCPdisconnected++ > 5){TCPdisconnected = 5;TCPconnected = 0;Serial.println("TCP disconnected, retry...");}
       ModBus.connect(remote);           // Try to connect if no connection
     }
-  }if(role == 1){       
+  }if(role == 1){ 
+
   }
   ModBus.task();                      // Common local Modbus task
   delay(10);                     // Polling interval
