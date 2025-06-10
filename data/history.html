@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>History Check</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        label { margin-right: 10px; }
+        input, button { margin: 5px 0; }
+        #result { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h2>History Check</h2>
+    <form id="historyForm">
+        <label for="startTime">Start Time:</label>
+        <input type="datetime-local" id="startTime" name="startTime" required>
+        <label for="endTime">End Time:</label>
+        <input type="datetime-local" id="endTime" name="endTime" required>
+        <button type="submit">Check History</button>
+    </form>
+    <div id="result"></div>
+
+    <script>
+        document.getElementById('historyForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const startTime = document.getElementById('startTime').value;
+            const endTime = document.getElementById('endTime').value;
+
+            // Example API endpoint, replace with your actual API URL
+            const apiUrl = `/api/history?start=${encodeURIComponent(startTime)}&end=${encodeURIComponent(endTime)}`;
+
+            document.getElementById('result').textContent = 'Loading...';
+
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) throw new Error('API error');
+                const data = await response.json();
+                document.getElementById('result').textContent = JSON.stringify(data, null, 2);
+            } catch (err) {
+                document.getElementById('result').textContent = 'Error: ' + err.message;
+            }
+        });
+    </script>
+</body>
+</html>

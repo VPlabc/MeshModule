@@ -145,71 +145,122 @@
                 <div class="status">Đóng</div>
                 <div class="updated" id="updated-1">Cập nhật: --:--:--</div>
             </div>
-            <div class="status-card opened" id="status-card-2">
-                <div class="icon"><i class="fa-solid fa-door-open"></i></div>
-                <div class="status">Mở</div>
+            <div class="status-card closed" id="status-card-2">
+                <div class="icon"><i class="fa-solid fa-door-closed"></i></div>
+                <div class="status">Đóng</div>
                 <div class="updated" id="updated-2">Cập nhật: --:--:--</div>
             </div>
-            <div class="status-card partial" id="status-card-3">
-                <div class="icon"><i class="fa-solid fa-grip-lines"></i></div>
-                <div class="status">Lưng lửng</div>
+            <div class="status-card closed" id="status-card-3">
+                <div class="icon"><i class="fa-solid fa-door-closed"></i></div>
+                <div class="status">Đóng</div>
                 <div class="updated" id="updated-3">Cập nhật: --:--:--</div>
             </div>
+            <script>
+                // Update icon based on status
+                function updateStatus(cardId, status, time) {
+                    const card = document.getElementById('status-card-' + cardId);
+                    card.classList.remove('closed', 'opened', 'partial');
+                    card.classList.add(status);
+                    const icon = card.querySelector('.icon i');
+                    if (status === 'closed') {
+                        icon.className = 'fa-solid fa-door-closed';
+                    } else if (status === 'opened') {
+                        icon.className = 'fa-solid fa-door-open';
+                    } else {
+                        icon.className = 'fa-solid fa-door-open fa-flip-horizontal';
+                    }
+                    card.querySelector('.status').textContent =
+                        status === 'closed' ? 'Đóng' :
+                        status === 'opened' ? 'Mở' : 'Lưng lửng';
+                    card.querySelector('.updated').textContent = 'Cập nhật: ' + time;
+                }
+            </script>
         </div>
         <!-- Control Cards -->
         <div class="control-cards">
             <div class="control-card" id="control-card-1">
                 <h3>Cửa cuốn 1</h3>
                 <div class="control-buttons">
-                    <button class="btn-open" onclick="sendAction(1, 'open')" title="Mở"><i class="fa-solid fa-arrow-up"></i></button>
-                    <button class="btn-stop" onclick="sendAction(1, 'stop')" title="Dừng"><i class="fa-solid fa-pause"></i></button>
-                    <button class="btn-close" onclick="sendAction(1, 'close')" title="Đóng"><i class="fa-solid fa-arrow-down"></i></button>
+                    <button class="btn-open" onclick="handleAction(1, 'open')" id="btn-open-1" title="Mở"><i class="fa-solid fa-arrow-up"></i></button>
+                    <button class="btn-stop" onclick="handleAction(1, 'stop')" id="btn-stop-1" title="Dừng" disabled><i class="fa-solid fa-pause"></i></button>
+                    <button class="btn-close" onclick="handleAction(1, 'close')" id="btn-close-1" title="Đóng"><i class="fa-solid fa-arrow-down"></i></button>
                 </div>
             </div>
             <div class="control-card" id="control-card-2">
                 <h3>Cửa cuốn 2</h3>
                 <div class="control-buttons">
-                    <button class="btn-open" onclick="sendAction(2, 'open')" title="Mở"><i class="fa-solid fa-arrow-up"></i></button>
-                    <button class="btn-stop" onclick="sendAction(2, 'stop')" title="Dừng"><i class="fa-solid fa-pause"></i></button>
-                    <button class="btn-close" onclick="sendAction(2, 'close')" title="Đóng"><i class="fa-solid fa-arrow-down"></i></button>
+                    <button class="btn-open" onclick="handleAction(2, 'open')" id="btn-open-2" title="Mở"><i class="fa-solid fa-arrow-up"></i></button>
+                    <button class="btn-stop" onclick="handleAction(2, 'stop')" id="btn-stop-2" title="Dừng" disabled><i class="fa-solid fa-pause"></i></button>
+                    <button class="btn-close" onclick="handleAction(2, 'close')" id="btn-close-2" title="Đóng"><i class="fa-solid fa-arrow-down"></i></button>
                 </div>
             </div>
             <div class="control-card" id="control-card-3">
                 <h3>Cửa cuốn 3</h3>
                 <div class="control-buttons">
-                    <button class="btn-open" onclick="sendAction(3, 'open')" title="Mở"><i class="fa-solid fa-arrow-up"></i></button>
-                    <button class="btn-stop" onclick="sendAction(3, 'stop')" title="Dừng"><i class="fa-solid fa-pause"></i></button>
-                    <button class="btn-close" onclick="sendAction(3, 'close')" title="Đóng"><i class="fa-solid fa-arrow-down"></i></button>
+                    <button class="btn-open" onclick="handleAction(3, 'open')" id="btn-open-3" title="Mở"><i class="fa-solid fa-arrow-up"></i></button>
+                    <button class="btn-stop" onclick="handleAction(3, 'stop')" id="btn-stop-3" title="Dừng" disabled><i class="fa-solid fa-pause"></i></button>
+                    <button class="btn-close" onclick="handleAction(3, 'close')" id="btn-close-3" title="Đóng"><i class="fa-solid fa-arrow-down"></i></button>
                 </div>
             </div>
+            <script>
+                // Timers for disabling open/close buttons and enabling stop
+                let disableTimers = [null, null, null];
+
+                function setButtonState(door, state) {
+                    // state: 'idle', 'moving'
+                    const btnOpen = document.getElementById('btn-open-' + door);
+                    const btnClose = document.getElementById('btn-close-' + door);
+                    const btnStop = document.getElementById('btn-stop-' + door);
+                    if (state === 'idle') {
+                        btnOpen.disabled = false;
+                        btnClose.disabled = false;
+                        btnStop.disabled = true;
+                    } else if (state === 'moving') {
+                        btnOpen.disabled = true;
+                        btnClose.disabled = true;
+                        btnStop.disabled = false;
+                    }
+                }
+
+                function handleAction(door, action) {
+                    if (action === 'open' || action === 'close') {
+                        setButtonState(door, 'moving');
+                        if (disableTimers[door-1]) clearTimeout(disableTimers[door-1]);
+                        disableTimers[door-1] = setTimeout(() => {
+                            setButtonState(door, 'idle');
+                            disableTimers[door-1] = null;
+                        }, 10000);
+                    } else if (action === 'stop') {
+                        setButtonState(door, 'idle');
+                        if (disableTimers[door-1]) {
+                            clearTimeout(disableTimers[door-1]);
+                            disableTimers[door-1] = null;
+                        }
+                    }
+                    sendAction(door, action);
+                }
+
+                // Initialize all stop buttons as disabled
+                for (let i = 1; i <= 3; i++) setButtonState(i, 'idle');
+            </script>
         </div>
     </div>
     <script>
         // Demo: Fake user
         document.getElementById('username').textContent = 'Nguyễn Văn A';
 
-        // Demo: Fake status update
-        function updateStatus(cardId, status, time) {
-            const card = document.getElementById('status-card-' + cardId);
-            card.classList.remove('closed', 'opened', 'partial');
-            card.classList.add(status);
-            card.querySelector('.status').textContent =
-                status === 'closed' ? 'Đóng' :
-                status === 'opened' ? 'Mở' : 'Lưng lửng';
-            card.querySelector('.updated').textContent = 'Cập nhật: ' + time;
-        }
 
-        // Simulate status update
-        setInterval(() => {
-            const now = new Date();
-            const timeStr = now.toLocaleTimeString('vi-VN');
-            // Random status for demo
-            const statuses = ['closed', 'opened', 'partial'];
-            for (let i = 1; i <= 3; i++) {
-                const status = statuses[Math.floor(Math.random() * 3)];
-                updateStatus(i, status, timeStr);
-            }
-        }, 5000);
+        // // Simulate status update
+        // setInterval(() => {
+        //     const now = new Date();
+        //     const timeStr = now.toLocaleTimeString('vi-VN');
+        //     // Random status for demo
+        //     const statuses = ['closed', 'opened', 'partial'];
+        //     for (let i = 1; i <= 3; i++) {
+        //         const status = statuses[Math.floor(Math.random() * 3)];
+        //         updateStatus(i, status, timeStr);
+        //     }
+        // }, 5000);
 
         // Action logic
         let actionTimers = [null, null, null];

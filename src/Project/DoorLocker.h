@@ -11,6 +11,10 @@
 #include <mbedtls/sha256.h>
 #include <LittleFS.h>
 #include "ssl_client.h"
+#include "ASyncElegantOTA.h" 
+
+byte DoorState = 0; // 0: Closed, 1: Open, 2: Stopped
+
 
 // Quản lý phiên đăng nhập
 String generateToken(int length) {
@@ -89,8 +93,8 @@ HistoryRecord* allocateRecord() {
 }
 
 // Cấu hình WiFi và SSL
-const char* ssid = "I-Soft";
-const char* password = "i-soft@2023";
+const char* SSID = "I-Soft";
+const char* PASS = "i-soft@2023";
 
 // SSL Certificate (self-signed)
 const char* ssl_cert = \
@@ -103,7 +107,7 @@ const char* ssl_key = \
 "MIIEvQIBADANBgkqhkiG9w0BAQEFAASC...\n" \
 "-----END PRIVATE KEY-----\n";
 
-AsyncWebServer server(443);
+AsyncWebServer DLserver(443);
 Sessions sessions; // Quản lý phiên
 
 // Tạo salt ngẫu nhiên
@@ -296,12 +300,24 @@ String getHistory(const String& user) {
 }
 // Định tuyến chính
 void setupServer() {
+   
   // Trang đăng ký
-  server.on("/register", HTTP_GET, [](AsyncWebServerRequest *request){
+DLserver.on("/register", HTTP_GET, [](AsyncWebServerRequest *request){
+    // Chỉ cho phép admin hoặc staff truy cập trang đăng ký
+    if (!checkAuth(request)) {
+        request->redirect("/login");
+        return;
+    }
+    String user = sessions.getUser(request->header("Cookie"));
+    // Kiểm tra quyền admin hoặc staff (giả sử user là "admin" hoặc "staff")
+    if (user != "admin" && user != "staff") {
+        request->send(403, "text/plain", "Forbidden: Only admin or staff can register new users.");
+        return;
+    }
     request->send(LittleFS, "/register.html");
-  });
+});
 
-  server.on("/register", HTTP_POST, [](AsyncWebServerRequest *request){
+  DLserver.on("/register", HTTP_POST, [](AsyncWebServerRequest *request){
     // Xử lý đăng ký
     String user = request->arg("username");
     String pass = request->arg("password");
@@ -323,11 +339,11 @@ void setupServer() {
   });
 
   // Trang đăng nhập
-  server.on("/login", HTTP_GET, [](AsyncWebServerRequest *request){
+  DLserver.on("/login", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send(LittleFS, "/login.html");
   });
 
-  server.on("/login", HTTP_POST, [](AsyncWebServerRequest *request){
+  DLserver.on("/login", HTTP_POST, [](AsyncWebServerRequest *request){
     String user = request->arg("username");
     String pass = request->arg("password");
     
@@ -349,7 +365,7 @@ void setupServer() {
   });
 
   // Trang lịch sử
-  server.on("/history", HTTP_GET, [](AsyncWebServerRequest *request){
+  DLserver.on("/history", HTTP_GET, [](AsyncWebServerRequest *request){
     if(!checkAuth(request)) {
       request->redirect("/login");
       return;
@@ -381,14 +397,53 @@ void setupServer() {
   });
 
   // Middleware bảo vệ
-  server.on("/dashboard", HTTP_GET, [](AsyncWebServerRequest *request){
+  DLserver.on("/dashboard", HTTP_GET, [](AsyncWebServerRequest *request){
     if(!checkAuth(request)) {
       request->redirect("/login");
       return;
     }
     request->send(LittleFS, "/dashboard.html");
   });
-  server.on("/tool", HTTP_GET, [](AsyncWebServerRequest *request) {
+
+// API: Cập nhật trạng thái cửa (open/close)
+DLserver.on("/api/door", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!checkAuth(request)) {
+        request->send(401, "application/json", "{\"error\":\"Unauthorized\"}");
+        return;
+    }
+    if (!request->hasParam("action", true)) {
+        request->send(400, "application/json", "{\"error\":\"Missing action parameter\"}");
+        return;
+    }
+    String action = request->getParam("action", true)->value();
+    String user = sessions.getUser(request->header("Cookie"));
+    uint8_t actionType = 0xFF;
+    if (action == "open") {
+        actionType = DOOR_OPEN;
+        // TODO: Thực hiện mở cửa vật lý ở đây
+    } else if (action == "close") {
+        actionType = DOOR_CLOSE;
+        // TODO: Thực hiện đóng cửa vật lý ở đây
+    } else {
+        request->send(400, "application/json", "{\"error\":\"Invalid action\"}");
+        return;
+    }
+    logAction(user.toInt(), actionType);
+    request->send(200, "application/json", "{\"status\":\"success\"}");
+});
+
+// API: Lấy trạng thái cửa cho FE
+DLserver.on("/api/door/status", HTTP_GET, [](AsyncWebServerRequest *request) {
+    if (!checkAuth(request)) {
+        request->send(401, "application/json", "{\"error\":\"Unauthorized\"}");
+        return;
+    }
+
+    String doorStatus = String(DoorState == 1 ? "open" : "closed");
+    request->send(200, "application/json", "{\"status\":\"" + doorStatus + "\"}");
+});
+
+  DLserver.on("/tool", HTTP_GET, [](AsyncWebServerRequest *request) {
         AsyncResponseStream *response = request->beginResponseStream("text/html");
         response->print("<!DOCTYPE html><html><head><title>System File Tool</title></head><style>");
         response->print("body { font-family: Arial, sans-serif; margin: 20px; }");
@@ -432,7 +487,7 @@ void setupServer() {
         request->send(response);
     });
     // API: Upload file
-    server.on("/upload", HTTP_POST, [](AsyncWebServerRequest *request) {
+    DLserver.on("/upload", HTTP_POST, [](AsyncWebServerRequest *request) {
         if (!checkAuth(request)) {
             request->send(401, "text/plain", "Unauthorized");
             return;
@@ -453,7 +508,7 @@ void setupServer() {
     });
 
     // API: Delete file
-    server.on("/delete", HTTP_DELETE, [](AsyncWebServerRequest *request) {
+    DLserver.on("/delete", HTTP_DELETE, [](AsyncWebServerRequest *request) {
         if (!checkAuth(request)) {
             request->send(401, "text/plain", "Unauthorized");
             return;
@@ -473,7 +528,7 @@ void setupServer() {
     });
 
     // API: List files (for file manager)
-    server.on("/list-files", HTTP_GET, [](AsyncWebServerRequest *request) {
+    DLserver.on("/list-files", HTTP_GET, [](AsyncWebServerRequest *request) {
         if (!checkAuth(request)) {
             request->send(401, "application/json", "[]");
             return;
@@ -501,19 +556,22 @@ void DoorSetup() {
   }
 
   // Kết nối WiFi
-  WiFi.begin(ssid, password);
+  WiFi.begin(SSID, PASS);
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
     Serial.println("Connecting to WiFi...");
   }
+  Serial.println("Connected to WiFi");
+  Serial.print("IP Address: ");
   Serial.println(WiFi.localIP());
-
+  AsyncElegantOTA.begin(&DLserver, "admin", "admin@123"); // Khởi tạo OTA với username và password
   // Cấu hình thời gian
-  configTime(0, 0, "pool.ntp.org");
+  configTime(7, 0, "pool.ntp.org");
+  Serial.println(" ⏰  Time configured");
+  setupServer();
 
   // Khởi động server
-  server.begin();
-  setupServer();
+  DLserver.begin();
 }
 
 void DoorLoop() {

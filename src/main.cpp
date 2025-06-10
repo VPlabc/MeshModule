@@ -2,7 +2,7 @@
 #include <ArduinoJson.h>
 #include <esp_spiram.h>
 #include <Arduino.h>
-
+#ifndef USE_DoorLocker
 // int timezone = 7;
 
 //#define TCP_ETH
@@ -1638,5 +1638,157 @@ else
 }
 // delay(3000);
 }
+#else
+#include "Project/DoorLocker.h"
+#define DoorUpState     15
+#define DoorStopState   16
+#define DoorDownState   17
+bool debug = true; // Set to true for debugging output
+#include <WiFi.h>
+#include <PubSubClient.h>
 
+const char* mqtt_server = "test.mosquitto.org"; // Replace with your MQTT broker address
+const char* mqtt_user = "";
+const char* mqtt_password = "";
+const char* mqtt_topic = "door/state";
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+void publishDoorState() {
+    String state = String(DoorState ? "Open" : "Closed");
+    client.publish(mqtt_topic, state.c_str(), true); // retain = true
+}
+
+void reconnect() {
+    // Loop until we're reconnected
+    while (!client.connected()) {
+        if (client.connect("DoorLockerClient")) {
+            client.subscribe(mqtt_topic);
+        } else {
+            delay(2000);
+        }
+    }
+}
+
+void mqttCallback(char* topic, byte* payload, unsigned int length) {
+    // Optionally handle incoming messages if needed
+    const char* message = (const char*)payload;
+    if (debug) {
+        Serial.print("Message arrived [");
+        Serial.print(topic);
+        Serial.print("]: ");
+        for (unsigned int i = 0; i < length; i++) {
+            Serial.print((char)payload[i]);
+        }
+        Serial.println();
+    }
+    //Door ID with state message for update client state
+    
+}
+
+void setup_mqtt_wifi() {
+    if(WiFi.status() != WL_CONNECTED) {
+        WiFi.begin(SSID, PASS); // Replace with your WiFi credentials
+        while (WiFi.status() != WL_CONNECTED) {
+            delay(500);
+            Serial.print(".");
+        }
+        Serial.println("Connected to WiFi");
+        Serial.print(" 🌐   IP address: ");
+        Serial.println(WiFi.localIP());
+    } else {
+        Serial.println("Already connected to WiFi");
+        client.setServer(mqtt_server, 1883);
+        client.setCallback(mqttCallback);
+    }
+}
+
+
+void DoorStates(){
+    if (DoorState == 0) { // Closed
+        if (digitalRead(DoorUpState) == HIGH) {
+            DoorState = 1; // Open
+            Serial.println("Door is now Open");
+        }
+    } else if (DoorState == 1) { // Open
+        if (digitalRead(DoorDownState) == HIGH) {
+            DoorState = 0; // Closed
+            Serial.println("Door is now Closed");
+        } else if (digitalRead(DoorStopState) == HIGH) {
+            DoorState = 2; // Stopped
+            Serial.println("Door is Stopped");
+        }
+    } else if (DoorState == 2) { // Stopped
+        if (digitalRead(DoorUpState) == HIGH) {
+            DoorState = 1; // Open
+            Serial.println("Door is now Open");
+        } else if (digitalRead(DoorDownState) == HIGH) {
+            DoorState = 0; // Closed
+            Serial.println("Door is now Closed");
+        }
+    }
+}
+#include <EEPROM.h>
+long resetcounter = 0;
+void setup() {
+    EEPROM.begin(512);
+    if(EEPROM.readLong(0) == 0xFFFFFFFF || EEPROM.readLong(0) == -1) {
+        EEPROM.writeLong(0, 0);
+        EEPROM.commit();
+    }
+    resetcounter = EEPROM.readLong(0);
+    Serial.begin(115200);
+    setup_mqtt_wifi();
+    DoorSetup();
+    Serial.println("DoorLocker setup completed.");
+    pinMode(DoorUpState, OUTPUT);
+    pinMode(DoorStopState, OUTPUT);
+    pinMode(DoorDownState, OUTPUT);
+    digitalWrite(DoorUpState, LOW);
+    digitalWrite(DoorStopState, LOW);
+    digitalWrite(DoorDownState, LOW);
+    client.setServer(mqtt_server, 1883);
+    client.setCallback(mqttCallback);
+    if (!client.connected()) {
+        reconnect();
+    }
+    if (debug) {
+        Serial.println("DoorLocker initialized with reset counter: " + String(resetcounter));
+    }
+}
+
+void loop() {
+    client.loop();
+
+    DoorLoop();
+    if (!client.connected()) {
+        reconnect();
+    }
+
+    static int lastState = DoorState;
+    if (DoorState != lastState) {
+        publishDoorState();
+        lastState = DoorState;
+    }
+
+    DoorLoop(); // Call the loop function from DoorLocker.h
+
+
+    static long lastLoopTime = millis();
+    if (millis() - lastLoopTime >= 10000) { // Run every second
+        lastLoopTime = millis();
+        Serial.println("\n=================================================");
+        Serial.println("DoorLocker loop running...");
+        Serial.println("  🖥️   Reset Counter: " + String(resetcounter));
+        Serial.println("  🚪   Door state: " + String(DoorState ? "Open" : "Closed"));
+        Serial.println("  💾   Free Heap: " + String(ESP.getFreeHeap() / 1024) + "Kb");
+        Serial.println("  🎞   Free PSRAM: " + String(ESP.getFreePsram() / 1024) + "Kb");
+        Serial.println("  🌡️  Chip : " + String(temperatureRead()) + " °C");
+        Serial.println("=================================================\n");
+        DoorStates();
+    }   
+    
+}
+#endif//USE_DoorLoker
 //580 - 6-15 chỉ

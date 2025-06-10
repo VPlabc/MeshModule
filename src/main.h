@@ -1,6 +1,9 @@
 #ifndef Main_H
 #define Main_H
 
+#define USE_DoorLocker // Enable Door Locker functionality
+#define USE_OTA // Enable Over-The-Air updates
+
 #define USE_VEHICLE
 #define TCP_ETH
 #define USE_SD

@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#define ESP32SC
+// #define ESP32SC
 
 #define DEBUG_ETHERNET_WEBSERVER_PORT       Serial
 // Debug Level from 0 to 4
