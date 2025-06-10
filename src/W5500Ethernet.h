@@ -1,5 +1,5 @@
 #include <Arduino.h>
-// #define ESP32SC
+#define ESP32SC
 
 #define DEBUG_ETHERNET_WEBSERVER_PORT       Serial
 // Debug Level from 0 to 4
@@ -9,8 +9,9 @@
 #else
 #include <WebServer_ESP32_W5500.h>
 #endif// ESP32
-// WebServer server(80);
 
+bool EthernetConnected = false;
+extern bool EthernetConnected;
 // Enter a MAC address and IP address for your controller below.
 #define NUMBER_OF_MAC      20
 
@@ -47,6 +48,13 @@ IPAddress dns2(8, 8, 4, 4);
 // Google DNS Server IP
 IPAddress myDNS(8, 8, 8, 8);
 
+bool getEtherConnectState(){
+  #ifdef ESP32SC
+  return ESP32_W5500_isConnected();
+  #else
+  return W5500ETH.isConnected();
+  #endif//ESP32SC
+}
 void W5500setup(int CS_GP,int INT_GP, int SCK_GP, int MISO_GP, int MOSI_GP)
 {
   if(MOSI_GP < 0 || MISO_GP < 0 || SCK_GP < 0 || CS_GP < 0 || INT_GP < 0){

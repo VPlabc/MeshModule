@@ -28,7 +28,7 @@
 //////////////////////////////////////////////////////////////
 
 bool ESP32_W5500_eth_connected = false;
-
+extern bool ESP32_W5500_eth_connected;
 void ESP32_W5500_onEvent()
 {
   WiFi.onEvent(ESP32_W5500_event);
@@ -48,7 +48,7 @@ bool ESP32_W5500_isConnected()
 {
   return ESP32_W5500_eth_connected;
 }
-
+extern bool ESP32_W5500_isConnected();
 //////////////////////////////////////////////////////////////
 
 void ESP32_W5500_event(WiFiEvent_t event)

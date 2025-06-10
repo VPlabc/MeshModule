@@ -96,7 +96,7 @@ void RTCTimeOnline::Time_setup(int timezoneOffset) {
 bool TimeOnce = 1;
 bool TimeDSOnce = 1;
 void RTCTimeOnline::Time_loop() {
-  if(!timeClient.update() && WiFi.status() == WL_CONNECTED) {
+  if(!timeClient.update() && (WiFi.status() == WL_CONNECTED ) ) {
     timeClient.forceUpdate();
   }else{
   // The formattedDate comes with the following format:

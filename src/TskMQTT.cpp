@@ -128,14 +128,14 @@ void connectToWifi() {
           Serial.println("✅  WiFi connected");
           Serial.println("IP address: ");
           Serial.println(WiFi.localIP());
-            if(wifiMode == "STA" && mqttEnable){
+            if((wifiMode == "STA"  ||  GetEthernetState()) && mqttEnable){
                 connectToMqtt();
             }
           webInterface.setupWebConfig();
           Serial.print("WiFi Channel: ");
           Serial.println(WiFi.channel());
           xTimerStop(wifiReconnectTimer, 0); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
-            if(wifiMode == "STA" && mqttEnable){
+            if((wifiMode == "STA" ||  GetEthernetState() ) && mqttEnable){
                 xTimerStart(mqttReconnectTimer, 0);
             }
           break;
@@ -227,22 +227,11 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
     if (jsonEnd != -1) {
         cleanPayload = cleanPayload.substring(0, jsonEnd + 1);
     }
-    JSONVar inputPro = JSON.parse(cleanPayload.c_str()); // Parse the input string as JSON
+    // JSONVar inputPro = JSON.parse(cleanPayload.c_str()); // Parse the input string as JSON
     // Handle JSON message for LED control
     // Check if the JSON contains "data" and "light" to control the LED
-    if (inputPro.hasOwnProperty("data")) {
-        bool lightValue = (bool)inputPro["data"]["light"];
-        Serial.print("Light value received: ");
-        Serial.println(lightValue);
-        if (lightValue) {
-            Serial.println("Turning on LED.");
-            digitalWrite(15, HIGH); // Turn on the LED
-        } else {
-            Serial.println("Turning off LED.");
-            digitalWrite(15, LOW); // Turn off the LED
-        }
-    }
-    MQTTaudioCmnd.audioCmnd(payload);
+
+    MQTTaudioCmnd.audioCmnd(cleanPayload.c_str()); // Call audio command handler with the cleaned payload
 
     // Forward message as before
     mqttClient.publish(mqttTopicPub.c_str(), mqttQos, mqttRetain, payload);    // Parse JSON
@@ -251,7 +240,8 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
   void onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
     Serial.println("Disconnected from MQTT.");
     mqttIsConnected = false;
-    if (WiFi.isConnected()) {
+    if (WiFi.isConnected() || GetEthernetState()) {
+        // Restart the MQTT reconnect timer
       xTimerStart(mqttReconnectTimer, 0);
     }
   }
@@ -314,6 +304,7 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
     // mqttClient.publish("test/lol", 0, true, "test 1");
     // Serial.println("Publishing at QoS 0");
     // Get current time
+    rtcOnline.Time_loop();
     rtcOnline.GetTime();
     char TimeAt[32];
     snprintf(TimeAt, sizeof(TimeAt), "%04d-%02d-%02d %02d:%02d:%02d", Getyear, Getmonth, Getday, Gethour, Getmin, Getsec);
@@ -424,7 +415,7 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
             return;
         }
     }
-    if(wifiMode == "STA" && mqttEnable){
+    if((wifiMode == "STA" || GetEthernetState()) && mqttEnable){
         Serial.println("MQTT enabled.");
         Serial.print("MQTT Host: ");
         Serial.println(mqttHost);
@@ -471,26 +462,31 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
     }
   
     WiFi.onEvent(WiFiEvent);
-    if(wifiMode == "STA" && mqttEnable){
+    if((wifiMode == "STA" || GetEthernetState()) && mqttEnable){
 
         mqttClient.onConnect(onMqttConnect);
         mqttClient.setServer(mqttHost.c_str(), mqttPort);
         mqttClient.setCredentials(mqttUser.c_str(), mqttPass.c_str());
-        connectToWifi();
+        if(wifiMode == "STA"){ connectToWifi(); }
     }
-    if(wifiMode == "STA"){
-        connectToWifi();
-    }
+    if(wifiMode == "STA"){ connectToWifi(); }
   }
 bool once2 = true;
   void WifiMqttConfig::loop(){
     if(once2){once2 = false;Serial.println("MQTT loop.");}
-    if (WiFi.status() != WL_CONNECTED && mqttEnable) {
+    if ((WiFi.status() != WL_CONNECTED || GetEthernetState()) && mqttEnable) {
         static unsigned long lastAttemptTime = 0;
         if (millis() - lastAttemptTime > 5000) { // Delay 2000ms between connection attempts
             lastAttemptTime = millis();
         }
     }
+
+    // if(!mqttIsConnected && mqttEnable && (WiFi.status() == WL_CONNECTED || GetEthernetState())) {
+    //     if (xTimerIsTimerActive(mqttReconnectTimer) == pdFALSE) {
+    //         xTimerStart(mqttReconnectTimer, 0);
+    //     }
+    // }
+
     if (reconnectAttempts >= 20) {
         Serial.println("Failed to connect to Wi-Fi after 3 attempts. Switching to AP mode.");
         // Cập nhật cấu hình sang chế độ AP

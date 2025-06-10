@@ -1,8 +1,8 @@
 #ifndef Main_H
 #define Main_H
 
-#define USE_DoorLocker // Enable Door Locker functionality
-#define USE_OTA // Enable Over-The-Air updates
+// #define USE_DoorLocker // Enable Door Locker functionality
+// #define USE_OTA // Enable Over-The-Air updates
 
 #define USE_VEHICLE
 #define TCP_ETH
@@ -137,6 +137,7 @@ void receiveCallback(const uint8_t *senderMac, const uint8_t *data, int dataLen)
 void sentCallback(const uint8_t *macAddr, esp_now_send_status_t status);
 void SupendTask();
 void ResumeTask();
+bool GetEthernetState();
 #endif//Gateway
 
 #endif//Main_h
