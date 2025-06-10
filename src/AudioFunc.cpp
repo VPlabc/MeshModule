@@ -56,55 +56,64 @@ void AudioCmd::audioCmnd(const char *input)
 {
     Serial.println("> Command: " + String(input));
         JSONVar inputPro = JSON.parse(input); // Parse the input string as JSON
-        if(inputPro.hasOwnProperty("data")) {
+        if (inputPro.hasOwnProperty("executeAt") && inputPro.hasOwnProperty("data")) {
+            JSONVar data = inputPro["data"];
+            // Light control
+            if (data.hasOwnProperty("light")) {
+                bool lightOn = (bool)data["light"];
+                if (lightOn) {
+                    digitalWrite(15, HIGH); // Turn on the LED
+                } else {
+                    digitalWrite(15, LOW); // Turn on the LED
+                }
+            }
+            // Volume control
+            if (data.hasOwnProperty("volume")) {
+                int vol = (int)data["volume"];
+                if (vol >= 0 && vol <= 7) {
+                    audio.setVolume(vol);
+                    Serial.printf("Set volume to %d\n", vol);
+                }
+            }
+            // Speech command
+            if (data.hasOwnProperty("speech")) {
+                const char* speechText = (const char*)data["speech"];
+                const char* speechVoice = "vi";
+                if (data.hasOwnProperty("voice")) {
+                    speechVoice = (const char*)data["voice"];
+                }
+                Serial.printf("Speaking: %s, Voice: %s\n", speechText, speechVoice);
+                audio.connecttospeech(speechText, speechVoice);
+            }
+        }
+        if(inputPro.hasOwnProperty("cmd")) {
             // audio.stopAudioTask();
             audioBuffer.init();
             audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
-            const char* cmd = (const char*)inputPro["data"]["cmd"];
+            const char* cmd = (const char*)inputPro["cmd"];
             char file[128] = {0};
             char url[256] = {0};
             char text[256] = {0};
             char voice[32] = "en";
-            int volume = 3;
-            bool lightValue = (bool)inputPro["data"]["light"];
 
-            Serial.print("Light value received: ");
-            Serial.println(lightValue);
-            if (lightValue) {
-                Serial.println("Turning on LED.");
-                digitalWrite(15, HIGH); // Turn on the LED
-            } else {
-                Serial.println("Turning off LED.");
-                digitalWrite(15, LOW); // Turn off the LED
-            }
             if(inputPro.hasOwnProperty("file")) {
-            strncpy(file, (const char*)inputPro["data"]["file"], sizeof(file) - 1);
+            strncpy(file, (const char*)inputPro["file"], sizeof(file) - 1);
             }
             if(inputPro.hasOwnProperty("url")) {
-            strncpy(url, (const char*)inputPro["data"]["url"], sizeof(url) - 1);
+            strncpy(url, (const char*)inputPro["url"], sizeof(url) - 1);
             }
-            if(inputPro.hasOwnProperty("speech")) {
-            strncpy(text, (const char*)inputPro["data"]["speech"], sizeof(text) - 1);
+            if(inputPro.hasOwnProperty("text")) {
+            strncpy(text, (const char*)inputPro["text"], sizeof(text) - 1);
             }
             if(inputPro.hasOwnProperty("voice")) {
-            strncpy(voice, (const char*)inputPro["data"]["voice"], sizeof(voice) - 1);
-            }
-            if(inputPro.hasOwnProperty("volume")) {
-                volume = (int)inputPro["data"]["volume"];
-                if(volume > 7) {
-                    volume = 7; // Limit volume to max 21
-                }
-                audio.setVolume(volume); // Set volume (0-21)
+            strncpy(voice, (const char*)inputPro["voice"], sizeof(voice) - 1);
             }
 
             if(strcmp(cmd, "play") == 0 && strlen(file) > 0) {
             Serial.println("Playing audio...");
             audio.connecttoFS(SD, file);
             }
-            else if(strlen(text) > 0) {// Handle text-to-speech
-                if(strlen(voice) == 0) {
-                    strncpy(voice, "vi", sizeof(voice) - 1); // Default voice
-                }
+            else if(strcmp(cmd, "speech") == 0 && strlen(text) > 0) {
             Serial.printf("Playing speech: %s, Voice: %s\n", text, voice);
             audio.connecttospeech(text, voice);
             }
@@ -125,24 +134,24 @@ void AudioCmd::audioCmnd(const char *input)
             audio.stopSong();audio_playing = false;
             }
             else if(strcmp(cmd, "seek") == 0 && inputPro.hasOwnProperty("position")) {
-            int position = inputPro["data"]["position"];
+            int position = inputPro["position"];
             Serial.printf("Seeking to position: %d seconds\n", position);
             audio.setAudioPlayPosition(position);
             }
             else if(strcmp(cmd, "volume") == 0 && inputPro.hasOwnProperty("level")) {
-            int level = inputPro["data"]["level"];
+            int level = inputPro["level"];
             Serial.printf("Setting volume to: %d\n", level);
             audio.setVolume(level);
             }
             else if(strcmp(cmd, "balance") == 0 && inputPro.hasOwnProperty("balance")) {
-            int balance = inputPro["data"]["balance"];
+            int balance = inputPro["balance"];
             Serial.printf("Setting balance to: %d\n", balance);
             audio.setBalance(balance);
             }
             else if(strcmp(cmd, "tone") == 0 && inputPro.hasOwnProperty("low") && inputPro.hasOwnProperty("mid") && inputPro.hasOwnProperty("high")) {
-            int low = inputPro["data"]["low"];
-            int mid = inputPro["data"]["mid"];
-            int high = inputPro["data"]["high"];
+            int low = inputPro["low"];
+            int mid = inputPro["mid"];
+            int high = inputPro["high"];
             Serial.printf("Setting tone - Low: %d, Mid: %d, High: %d\n", low, mid, high);
             audio.setTone(low, mid, high);
             }
@@ -156,7 +165,7 @@ void AudioCmd::audioCmnd(const char *input)
             else if(strcmp(cmd, "help") == 0) {
             Serial.println("Available commands:");
             Serial.println("  {\"cmd\":\"play\",\"file\":<file>} : Play a specified audio file.");
-            Serial.println("  {\"speech\":<text>, \"voice\":<voice>} : Convert text to speech.");
+            Serial.println("  {\"cmd\":\"speech\",\"text\":<text>, \"voice\":<voice>} : Convert text to speech.");
             Serial.println("  {\"cmd\":\"playurl\",\"url\":<url>} : Play audio from a specified URL.");
             Serial.println("  {\"cmd\":\"resume\"} : Resume audio playback.");
             Serial.println("  {\"cmd\":\"pause\"} : Pause audio playback.");

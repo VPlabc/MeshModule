@@ -16,6 +16,10 @@ TimerHandle_t wifiReconnectTimer;
 #endif//MQTT_Client
 
 // bool mqttIsConnected = false;
+bool eth_connected = false;
+
+bool once2 = true;
+bool once3 = true;
 
 void WifiMqttConfig::saveJsonToWifiMqttFile(char &jsonString,bool debug, fs::FS &FileSystem) {
     File file = FileSystem.open(WIFIMQTT_FILE, "w");
@@ -128,14 +132,14 @@ void connectToWifi() {
           Serial.println("✅  WiFi connected");
           Serial.println("IP address: ");
           Serial.println(WiFi.localIP());
-            if((wifiMode == "STA"  ||  GetEthernetState()) && mqttEnable){
+            if(wifiMode == "STA" && mqttEnable){
                 connectToMqtt();
             }
           webInterface.setupWebConfig();
           Serial.print("WiFi Channel: ");
           Serial.println(WiFi.channel());
           xTimerStop(wifiReconnectTimer, 0); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
-            if((wifiMode == "STA" ||  GetEthernetState() ) && mqttEnable){
+            if(wifiMode == "STA" && mqttEnable){
                 xTimerStart(mqttReconnectTimer, 0);
             }
           break;
@@ -152,19 +156,20 @@ void connectToWifi() {
         ETH.setHostname("iotdevice");
         #endif//USE_LAN8720
         break;
-    case SYSTEM_EVENT_ETH_CONNECTED:
-        LOGLN("ETH Connected");
+    case 22:
+        LOGLN(" ✅   ETH Connected");
+            eth_connected = true;
         break;
     case SYSTEM_EVENT_ETH_GOT_IP:
     
         break;
-        case SYSTEM_EVENT_ETH_DISCONNECTED:
-            LOGLN("ETH Disconnected");
-            //eth_connected = false;
+        case 21:
+            LOGLN(" ❌  ETH Disconnected");
+            eth_connected = false;
             break;
         case SYSTEM_EVENT_ETH_STOP:
-            LOGLN("ETH Stopped");
-            // eth_connected = false;
+            LOGLN(" ❌  ETH Stopped");
+            eth_connected = false;
             break;
 
         case SYSTEM_EVENT_STA_CONNECTED:
@@ -221,17 +226,7 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
     Serial.print("  total: ");
     Serial.println(total);
 
-    // Remove any trailing non-JSON characters (e.g., stray bytes after the payload)
-    String cleanPayload = String(payload);
-    int jsonEnd = cleanPayload.lastIndexOf('}');
-    if (jsonEnd != -1) {
-        cleanPayload = cleanPayload.substring(0, jsonEnd + 1);
-    }
-    // JSONVar inputPro = JSON.parse(cleanPayload.c_str()); // Parse the input string as JSON
-    // Handle JSON message for LED control
-    // Check if the JSON contains "data" and "light" to control the LED
-
-    MQTTaudioCmnd.audioCmnd(cleanPayload.c_str()); // Call audio command handler with the cleaned payload
+    MQTTaudioCmnd.audioCmnd(payload);
 
     // Forward message as before
     mqttClient.publish(mqttTopicPub.c_str(), mqttQos, mqttRetain, payload);    // Parse JSON
@@ -240,7 +235,28 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
   void onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
     Serial.println("Disconnected from MQTT.");
     mqttIsConnected = false;
-    if (WiFi.isConnected() || GetEthernetState()) {
+    once3 = false; // Reset the once3 flag to allow reconnection
+    if (WiFi.isConnected() || eth_connected) {
+        Serial.print("Reason: ");
+        Serial.println(static_cast<uint8_t>(reason));
+        if (reason == AsyncMqttClientDisconnectReason::TCP_DISCONNECTED) {
+            Serial.println("TCP Disconnected. Attempting to reconnect...");
+        } else if (reason == AsyncMqttClientDisconnectReason::MQTT_UNACCEPTABLE_PROTOCOL_VERSION) {
+            Serial.println("Unacceptable MQTT protocol version.");
+        } else if (reason == AsyncMqttClientDisconnectReason::MQTT_IDENTIFIER_REJECTED) {
+            Serial.println("MQTT identifier rejected.");
+        } else if (reason == AsyncMqttClientDisconnectReason::MQTT_SERVER_UNAVAILABLE) {
+            Serial.println("MQTT server unavailable.");
+        } else if (reason == AsyncMqttClientDisconnectReason::MQTT_MALFORMED_CREDENTIALS) {
+            Serial.println("Malformed MQTT credentials.");
+        } else if (reason == AsyncMqttClientDisconnectReason::MQTT_NOT_AUTHORIZED) {
+            Serial.println("Not authorized to connect to MQTT server.");
+        } else if (reason == AsyncMqttClientDisconnectReason::ESP8266_NOT_ENOUGH_SPACE) {
+            Serial.println("ESP8266 not enough space for MQTT operation.");
+        } else if (reason == AsyncMqttClientDisconnectReason::TLS_BAD_FINGERPRINT) {
+            Serial.println("TLS bad fingerprint for MQTT connection.");
+        }
+        
         // Restart the MQTT reconnect timer
       xTimerStart(mqttReconnectTimer, 0);
     }
@@ -304,7 +320,6 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
     // mqttClient.publish("test/lol", 0, true, "test 1");
     // Serial.println("Publishing at QoS 0");
     // Get current time
-    rtcOnline.Time_loop();
     rtcOnline.GetTime();
     char TimeAt[32];
     snprintf(TimeAt, sizeof(TimeAt), "%04d-%02d-%02d %02d:%02d:%02d", Getyear, Getmonth, Getday, Gethour, Getmin, Getsec);
@@ -415,7 +430,7 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
             return;
         }
     }
-    if((wifiMode == "STA" || GetEthernetState()) && mqttEnable){
+    if( mqttEnable){
         Serial.println("MQTT enabled.");
         Serial.print("MQTT Host: ");
         Serial.println(mqttHost);
@@ -462,30 +477,36 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
     }
   
     WiFi.onEvent(WiFiEvent);
-    if((wifiMode == "STA" || GetEthernetState()) && mqttEnable){
-
+    if( mqttEnable){
         mqttClient.onConnect(onMqttConnect);
         mqttClient.setServer(mqttHost.c_str(), mqttPort);
         mqttClient.setCredentials(mqttUser.c_str(), mqttPass.c_str());
-        if(wifiMode == "STA"){ connectToWifi(); }
+        if(wifiMode == "STA"){connectToWifi();}
     }
-    if(wifiMode == "STA"){ connectToWifi(); }
+    if(wifiMode == "STA"){
+        connectToWifi();
+    }
   }
-bool once2 = true;
+
   void WifiMqttConfig::loop(){
     if(once2){once2 = false;Serial.println("MQTT loop.");}
-    if ((WiFi.status() != WL_CONNECTED || GetEthernetState()) && mqttEnable) {
+    
         static unsigned long lastAttemptTime = 0;
         if (millis() - lastAttemptTime > 5000) { // Delay 2000ms between connection attempts
             lastAttemptTime = millis();
+            Serial.println(" 📋 eth_connected: " + String(eth_connected ? "✔️" : "❌"));
+            Serial.println(" 📋 WiFi.isConnected(): " + String(WiFi.isConnected() ? "✔️" : "❌"));
+            Serial.println(" 📋 mqttIsConnected: " + String(mqttIsConnected ? "✔️" : "❌"));
+            Serial.println(" 📋 mqttEnable: " + String(mqttEnable ? "✔️" : "❌"));
+            if (eth_connected && !mqttIsConnected && mqttEnable) {
+                // xTimerStop(wifiReconnectTimer, 0);
+                Serial.println(" ✅   ethernet connected, attempting to connect to MQTT...");
+                connectToMqtt();
+                // xTimerStart(wifiReconnectTimer, 0);
+            }
+            if ((WiFi.status() != WL_CONNECTED || eth_connected) && mqttEnable) {
+            }
         }
-    }
-
-    // if(!mqttIsConnected && mqttEnable && (WiFi.status() == WL_CONNECTED || GetEthernetState())) {
-    //     if (xTimerIsTimerActive(mqttReconnectTimer) == pdFALSE) {
-    //         xTimerStart(mqttReconnectTimer, 0);
-    //     }
-    // }
 
     if (reconnectAttempts >= 20) {
         Serial.println("Failed to connect to Wi-Fi after 3 attempts. Switching to AP mode.");

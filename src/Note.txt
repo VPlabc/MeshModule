@@ -164,3 +164,9 @@ list các thông số
 
 
 {   "cmd": "playurl",   "url": "http://stream2.dancewave.online:8080/dance.ogg" }
+{"cmd":"play","file":"/file7.mp3"}
+
+topics:
+1. led: vms/coca/led
+2. material: vms/coca/notify/material
+3. loading area: vms/coca/notify/loading
