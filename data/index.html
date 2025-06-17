@@ -2221,8 +2221,8 @@
                         ${!isNaN(parseFloat(chipTemp)) ? parseFloat(chipTemp).toFixed(2) + ' °C' : '-'}
                     </div>
                 </div>
-                ${gaugeHtml('Free RAM', typeof freeRam === 'number' ? freeRam : '-', 70, 200, 'KB', '#2196F3')}
-                ${gaugeHtml('Free SRAM', typeof freeSram === 'number' ? freeSram : '-', 90, 200, 'KB', '#4caf50')}
+                ${gaugeHtml('Free RAM', typeof freeRam === 'number' ? freeRam : '-', 0, 200, 'KB', '#2196F3')}
+                ${gaugeHtml('Free SRAM', typeof freeSram === 'number' ? freeSram : '-', 0, 8000, 'KB', '#4caf50')}
                 <div style="flex:1; min-width:140px; margin:8px 8px 8px 0; background:#fff; border-radius:8px; box-shadow:0 1px 4px #ccc; padding:16px 12px;">
                     <div style="font-size:15px; color:#555; margin-bottom:8px;">Reset Counter</div>
                     <div style="font-size:18px; font-weight:bold; color:#9c27b0;">${resetCounter}</div>

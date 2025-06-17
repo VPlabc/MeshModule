@@ -163,10 +163,21 @@ list các thông số
 {"cmd":"stop"}
 
 
-{   "cmd": "playurl",   "url": "http://stream2.dancewave.online:8080/dance.ogg" }
+{"cmd":"playurl","url":"http://stream2.dancewave.online:8080/dance.ogg"}
 {"cmd":"play","file":"/file7.mp3"}
-
+{"cmd":"playurl","url":"http://www.wdr.de/wdrlive/media/einslive.m3u"}
 topics:
 1. led: vms/coca/led
 2. material: vms/coca/notify/material
 3. loading area: vms/coca/notify/loading
+
+
+{
+   "executeAt":"2025-06-04T09:00:00Z",
+   "data":{
+      "light":true,
+      "volume":1-7,
+     "speech": "ALO ALO 1 2 3 4",
+     "voice":"vi"
+   }
+}
