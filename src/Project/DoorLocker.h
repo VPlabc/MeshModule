@@ -69,6 +69,16 @@ public:
   
   String getUser(String cookie) {
     // ... trích xuất user từ cookie
+    int tokenStart = cookie.indexOf("session_token=");
+    if (tokenStart == -1) return "";
+    int tokenEnd = cookie.indexOf(";", tokenStart);
+    String token = (tokenEnd == -1) ?
+      cookie.substring(tokenStart + 14) :
+      cookie.substring(tokenStart + 14, tokenEnd);
+    for (auto& s : sessions) {
+      if (s.token == token) return s.user;
+    }
+    return "";
   }
   
   void cleanup() {
@@ -107,7 +117,8 @@ const char* ssl_key = \
 "MIIEvQIBADANBgkqhkiG9w0BAQEFAASC...\n" \
 "-----END PRIVATE KEY-----\n";
 
-AsyncWebServer DLserver(443);
+AsyncWebServer DLservers(443);
+AsyncWebServer DLserver(80);
 Sessions sessions; // Quản lý phiên
 
 // Tạo salt ngẫu nhiên
@@ -230,6 +241,8 @@ bool validateUser(const String& user, const String& password) {
         return false;
     }
     
+    idx = 0; // Reset idx at the start of validation
+
     const char* content = file.readString().c_str();
     DynamicJsonDocument doc(1024);
     DeserializationError error = deserializeJson(doc, content);
@@ -247,6 +260,8 @@ bool validateUser(const String& user, const String& password) {
             if(hashedPass == userObj["password_hash"]) {
                 file.close();
                 return true; // Đăng nhập thành công
+            } else {
+                idx = 0; // Reset idx if password does not match
             }
         }
     }
@@ -262,6 +277,9 @@ void logAction(uint16_t user, uint8_t action) {
     historyStorage.addRecord(user, action);
     // Hoặc sử dụng recordPool để lưu trữ tạm thời
     // Ví dụ: 
+    // record->user = user;
+    // record->action = action;
+    record->timestamp = time(nullptr); // epoch time (seconds since 1970-01-01)
     Serial.printf("User: %s, Action: %s, Time: %lu\n", String(user), String(action), record->timestamp);
 }
 
@@ -300,7 +318,6 @@ String getHistory(const String& user) {
 }
 // Định tuyến chính
 void setupServer() {
-   
   // Trang đăng ký
 DLserver.on("/register", HTTP_GET, [](AsyncWebServerRequest *request){
     // Chỉ cho phép admin hoặc staff truy cập trang đăng ký
@@ -313,8 +330,10 @@ DLserver.on("/register", HTTP_GET, [](AsyncWebServerRequest *request){
     if (user != "admin" && user != "staff") {
         request->send(403, "text/plain", "Forbidden: Only admin or staff can register new users.");
         return;
+    } else {
+        request->send(LittleFS, "/register.html");
+        return;
     }
-    request->send(LittleFS, "/register.html");
 });
 
   DLserver.on("/register", HTTP_POST, [](AsyncWebServerRequest *request){
@@ -339,11 +358,11 @@ DLserver.on("/register", HTTP_GET, [](AsyncWebServerRequest *request){
   });
 
   // Trang đăng nhập
-  DLserver.on("/login", HTTP_GET, [](AsyncWebServerRequest *request){
+  DLservers.on("/login", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send(LittleFS, "/login.html");
   });
 
-  DLserver.on("/login", HTTP_POST, [](AsyncWebServerRequest *request){
+  DLservers.on("/login", HTTP_POST, [](AsyncWebServerRequest *request){
     String user = request->arg("username");
     String pass = request->arg("password");
     
@@ -353,12 +372,12 @@ DLserver.on("/register", HTTP_GET, [](AsyncWebServerRequest *request){
         Serial.printf("User %s [%d] logged in with token %s\n", user.c_str(), idx , token.c_str());
       // Ghi log
       logAction(idx, LOGIN);
-      
       // Gửi cookie
       AsyncWebServerResponse *response = request->beginResponse(302, "text/plain", "");
       response->addHeader("Location", "/dashboard");
       response->addHeader("Set-Cookie", "session_token=" + token + "; HttpOnly; Secure; Max-Age=3600");
       request->send(response);
+
     } else {
       request->send(401, "text/plain", "Invalid credentials");
     }
@@ -397,12 +416,12 @@ DLserver.on("/register", HTTP_GET, [](AsyncWebServerRequest *request){
   });
 
   // Middleware bảo vệ
-  DLserver.on("/dashboard", HTTP_GET, [](AsyncWebServerRequest *request){
+  DLservers.on("/dashboard", HTTP_GET, [](AsyncWebServerRequest *request){
     if(!checkAuth(request)) {
       request->redirect("/login");
       return;
     }
-    request->send(LittleFS, "/dashboard.html");
+    request->send(LittleFS, "/mainPage.html");
   });
 
 // API: Cập nhật trạng thái cửa (open/close)
@@ -442,6 +461,81 @@ DLserver.on("/api/door/status", HTTP_GET, [](AsyncWebServerRequest *request) {
     String doorStatus = String(DoorState == 1 ? "open" : "closed");
     request->send(200, "application/json", "{\"status\":\"" + doorStatus + "\"}");
 });
+// API: Check if any user exists
+DLserver.on("/api/has-user", HTTP_GET, [](AsyncWebServerRequest *request) {
+  File file = LittleFS.open("/users.json", "r");
+  bool hasUser = false;
+  if (file) {
+    String content = file.readString();
+    DynamicJsonDocument doc(512);
+    if (deserializeJson(doc, content) == DeserializationError::Ok) {
+      JsonArray arr = doc.as<JsonArray>();
+      hasUser = arr.size() > 0;
+    }
+    doc.clear();
+    file.close();
+  }
+  request->send(200, "application/json", String("{\"hasUser\":") + (hasUser ? "true" : "false") + "}");
+});
+
+// Trang tạo mật khẩu admin/staff nếu chưa có user nào
+DLserver.on("/init-admin", HTTP_GET, [](AsyncWebServerRequest *request) {
+  File file = LittleFS.open("/users.json", "r");
+  bool hasUser = false;
+  if (file) {
+    String content = file.readString();
+    DynamicJsonDocument doc(512);
+    if (deserializeJson(doc, content) == DeserializationError::Ok) {
+      JsonArray arr = doc.as<JsonArray>();
+      hasUser = arr.size() > 0;
+      doc.clear();
+    }
+  }
+  if (hasUser) {
+    request->redirect("/login");
+    return;
+  } else {
+  // Trang HTML tạo mật khẩu admin/staff
+  String html = "<!DOCTYPE html><html><head><title>Init Admin</title></head><body>";
+  html += "<h2>Initialize Admin/Staff Account</h2>";
+  html += "<form method='POST' action='/init-admin'>";
+  html += "Username: <input name='username' required><br>";
+  html += "Password: <input name='password' type='password' required><br>";
+  html += "<button type='submit'>Create</button></form></body></html>";
+  request->send(200, "text/html", html);
+  }
+});
+
+DLserver.on("/init-admin", HTTP_POST, [](AsyncWebServerRequest *request) {
+  File file = LittleFS.open("/users.json", "r");
+  bool hasUser = false;
+  if (file) {
+    String content = file.readString();
+    DynamicJsonDocument doc(512);
+    if (deserializeJson(doc, content) == DeserializationError::Ok) {
+      JsonArray arr = doc.as<JsonArray>();
+      hasUser = arr.size() > 0;
+    }
+    file.close();
+  }
+  if (hasUser) {
+    request->redirect("/login");
+    return;
+  }
+  String user = request->arg("username");
+  String pass = request->arg("password");
+  if (user.length() == 0 || pass.length() == 0) {
+    request->send(400, "text/plain", "Missing username or password");
+    return;
+  }
+  String salt = generateSalt();
+  String hashedPass = hashPassword(pass, salt);
+  addUser(user, hashedPass, salt);
+  request->send(200, "text/html", "<h3>Admin/Staff account created. <a href='/login'>Go to login</a></h3>");
+});
+
+///json web token
+///clinet id trên web
 
   DLserver.on("/tool", HTTP_GET, [](AsyncWebServerRequest *request) {
         AsyncResponseStream *response = request->beginResponseStream("text/html");
@@ -529,10 +623,10 @@ DLserver.on("/api/door/status", HTTP_GET, [](AsyncWebServerRequest *request) {
 
     // API: List files (for file manager)
     DLserver.on("/list-files", HTTP_GET, [](AsyncWebServerRequest *request) {
-        if (!checkAuth(request)) {
-            request->send(401, "application/json", "[]");
-            return;
-        }
+        // if (!checkAuth(request)) {
+        //     request->send(401, "application/json", "[]");
+        //     return;
+        // }
         String json = "[";
         File root = LittleFS.open("/");
         File file = root.openNextFile();
@@ -556,14 +650,14 @@ void DoorSetup() {
   }
 
   // Kết nối WiFi
-  WiFi.begin(SSID, PASS);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(1000);
-    Serial.println("Connecting to WiFi...");
-  }
-  Serial.println("Connected to WiFi");
-  Serial.print("IP Address: ");
-  Serial.println(WiFi.localIP());
+  // WiFi.begin(SSID, PASS);
+  // while (WiFi.status() != WL_CONNECTED) {
+  //   delay(1000);
+  //   Serial.println("Connecting to WiFi...");
+  // }
+  // Serial.println("Connected to WiFi");
+  // Serial.print("IP Address: ");
+  // Serial.println(WiFi.localIP());
   AsyncElegantOTA.begin(&DLserver, "admin", "admin@123"); // Khởi tạo OTA với username và password
   // Cấu hình thời gian
   configTime(7, 0, "pool.ntp.org");
@@ -571,6 +665,7 @@ void DoorSetup() {
   setupServer();
 
   // Khởi động server
+  DLservers.begin();
   DLserver.begin();
 }
 
