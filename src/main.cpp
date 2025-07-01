@@ -2,6 +2,8 @@
 #include <ArduinoJson.h>
 #include <esp_spiram.h>
 #include <Arduino.h>
+#include "LEDRGB.h"
+
 #ifndef USE_DoorLocker
 // int timezone = 7;
 
@@ -76,6 +78,9 @@ WifiMqttConfig MQTTwifiConfig; // Ensure this is declared only if USE_Modbus is 
 //////////////////////// Task handles ////////////////////////
 TaskHandle_t TaskMQTT;
 
+#ifdef USE_TCP
+#include "TCP_Src.h"
+#endif//USE_TCP
 
 #define RTC_Onl
 #include "RTC_Online.h"
@@ -101,7 +106,9 @@ LoRaFunction mainLoRa; // Ensure this is declared only if USE_Modbus is defined
 std::map<int, NodeDatas> nodeDataMaps;
 
 JSONVar mainModbusSetting;
-  
+JSONVar mainTcpConfig;
+ 
+int32_t TCP_PORT = 10000;
 
 #include <DNSServer.h>
 DNSServer dnsServer;
@@ -114,7 +121,9 @@ bool configMode = false;
 #include <EEPROM.h>
 long resetcounter = 0;
 // void convertDataPacketToDataLookline(const dataPacket &packet, struct_Parameter_messageOld &dataLookline);
-  
+#ifdef USE_TCP
+bool TCP_Enable = false;
+#endif//USE_TCP
 
 void MainLoop();
 
@@ -254,7 +263,7 @@ void loadConfig() {
         MeshConfig.macSlaves = doc.createNestedArray("macSlaves");
         MeshConfig.dataVersion = 0; // Default dataVersion
         MeshConfig.boardModel = 1;
-        MeshConfig.MeshEnable = true; // Mặc định bật Mesh
+        MeshConfig.MeshEnable = false; // Mặc định tắt Mesh
         saveConfig(); // Save the configuration
         return;
     }
@@ -276,7 +285,8 @@ void loadConfig() {
         Serial.println(error.c_str());
         return;
     }
-    MeshConfig.boardModel = doc["boardModel"];
+    // MeshConfig.boardModel = doc["boardModel"];
+    MeshConfig.boardModel = 6;//doc["boardModel"];
     const char* BrokerStr = doc["BrokerAddress"];
     if (BrokerStr) {
         int values[6];
@@ -298,11 +308,13 @@ void loadConfig() {
     MeshConfig.netId = doc["netId"];
     MeshConfig.dataVersion = doc["dataVersion"] | 0; // Default to 0 if not specified
     strlcpy(MeshConfig.role, doc["role"] | "Node", sizeof(MeshConfig.role)); // Default to "Node" if not specified
-    MeshConfig.debug = doc["debug"] | true; // Default debug enabled
+    // MeshConfig.debug = doc["debug"] | true; // Default debug enabled
+    MeshConfig.debug = true; // Default debug enabled
     MeshConfig.macSlaves = doc["macSlaves"].as<JsonArray>();
     MeshConfig.LoRaEnable = doc["loraEnb"] | false;
     MeshConfig.BuzzEnable = doc["buzzEnb"] | false; // Default Buzz disabled
-    MeshConfig.MeshEnable = doc["meshEnable"] | true; // Mặc định bật Mesh
+    // MeshConfig.MeshEnable = doc["meshEnable"] | false; // Mặc định tắt Mesh
+    MeshConfig.MeshEnable = false; // Mặc định tắt Mesh
     file.close();
     set_Pinout(MeshConfig.boardModel);
     if (MeshConfig.debug) Serial.println("Config loaded.");
@@ -581,6 +593,11 @@ void sentCallback(const uint8_t *macAddr, esp_now_send_status_t status)
         Serial.println("%");
     }
 }
+
+
+#include <queue>
+
+std::queue<dataPacket> dataQueue;
 #ifdef ESP32_RISCV
 void receiveCallback(const esp_now_recv_info *recvInfo, const uint8_t *data, int dataLen) {
     char macStr[18];
@@ -626,9 +643,7 @@ void receiveCallback(const esp_now_recv_info *recvInfo, const uint8_t *data, int
     }
 }
 #else//ESP32_RISCV
-#include <queue>
 
-std::queue<dataPacket> dataQueue;
 
 void receiveCallback(const uint8_t *senderMac, const uint8_t *data, int dataLen)
 {
@@ -703,6 +718,7 @@ void receiveCallback(const uint8_t *senderMac, const uint8_t *data, int dataLen)
     jsonDoc.clear(); // Clear the JSON document for the next use
 }
 
+#endif//ESP32_RISCV
 void processQueue() {
     while (!dataQueue.empty()) {
         dataPacket packet = dataQueue.front(); // Lấy phần tử đầu tiên
@@ -763,7 +779,6 @@ void processQueue() {
     }
 }
 
-#endif//ESP32_RISCV
 #ifdef ESP32
 #else//ESP8266
 void transmissionComplete(uint8_t *receiver_mac, uint8_t transmissionStatus) {
@@ -877,7 +892,7 @@ void startConfigPortal() {
     current_wifi_interface = WIFI_IF_AP; // Sử dụng giao diện Wi-Fi Station
         WiFi.mode(WIFI_AP);
         WiFi.softAPConfig(apIP, apIP, subnet);
-        String APname = "MeshModule[" + String(MeshConfig.id) + ']';
+        String APname = "LED_VMS[" + String(MeshConfig.id) + ']';
         WiFi.softAP(APname.c_str(), "12345678"); // Replace with your desired SSID and password
         dnsServer.start(DNS_PORT, "*", apIP);
         check_protocol();
@@ -946,8 +961,51 @@ void checkConfigButton() {
         buttonPressTime = 0;
     }
 }
+#ifdef USE_TCP
+void LoadTCPConfig(){
+    if (!FileSystem.exists("/TCPconfig.json")) {
+        if (MeshConfig.debug) Serial.println("TCPconfig.json not found.");
+        return;
+    }
 
+    File file = FileSystem.open("/TCPconfig.json", "r");
+    if (!file) {
+        if (MeshConfig.debug) Serial.println("Failed to open TCPconfig.json for reading.");
+        return;
+    }
 
+    DynamicJsonDocument doc(512);
+    DeserializationError error = deserializeJson(doc, file);
+    file.close();
+
+    if (error) {
+        if (MeshConfig.debug) {
+            Serial.println("Failed to parse TCPconfig.json.");
+            Serial.println(error.c_str());
+        }
+        return;
+    }
+
+    const char* ip = doc["tcpIp"] | "192.168.1.100";
+    bool role = doc["tcpMode"] | false;
+    int port = doc["tcpPort"] | 10000;
+    TCP_Enable = doc["tcpEnable"] | false;
+    if (!TCP_Enable) {
+        if (MeshConfig.debug) Serial.println("TCP is disabled in the configuration.");
+        return;
+    }
+    TCP_Config((char*)ip, role, 1, port);
+
+    if (MeshConfig.debug) {
+        Serial.print("Loaded TCP config: ip=");
+        Serial.print(ip);
+        Serial.print(", role=");
+        Serial.print(role);
+        Serial.print(", port=");
+        Serial.println(port);
+    }
+}
+#endif//USE_TCP
 ///////////////////////////////////////////////////////// Serial TTL -> Mesh /////////////////////////////////////////////////////
 
 uint8_t  incomingData[sizeof(struct dataPacket)];
@@ -969,44 +1027,6 @@ void receiveDataPacketFromSerial2() {
                 peerInfo.channel = MeshConfig.wifiChannel;
                 esp_now_add_peer(&peerInfo);
             }
-
-        //     if(MeshConfig.debug) {
-        //         // In ra dữ liệu đã chuyển đổi
-        //         Serial.println("DataLookline:");
-        //         Serial.print("Network ID: ");
-        //         Serial.println(DataLookline.networkID);
-        //         Serial.print("Node ID: ");
-        //         Serial.println(DataLookline.nodeID);
-        //         Serial.print("PLAN: ");
-        //         Serial.println(DataLookline.PLAN);
-        //         Serial.print("RESULT: ");
-        //         Serial.println(DataLookline.RESULT);
-        //         Serial.print("State: ");
-        //         Serial.println(DataLookline.state);
-        //         Serial.print("Mode: ");
-        //         Serial.println(DataLookline.Mode);
-        //     }
-
-        //     String id = "";
-        //     id += String((DataLookline.nodeID / 1000) % 10);
-        //     id += String((DataLookline.nodeID / 100) % 10);
-        //     id += String((DataLookline.nodeID / 10) % 10);
-        //     id += String((DataLookline.nodeID / 1) % 10);
-
-        //     String StringPlan = "";
-        //     StringPlan += (DataLookline.PLAN / 1000) % 10;
-        //     StringPlan += (DataLookline.PLAN / 100) % 10;
-        //     StringPlan += (DataLookline.PLAN / 10) % 10;
-        //     StringPlan += (DataLookline.PLAN / 1) % 10;
-
-        //     String StringResult = "";
-        //     StringResult += (DataLookline.RESULT / 1000) % 10;
-        //     StringResult += (DataLookline.RESULT / 100) % 10;
-        //     StringResult += (DataLookline.RESULT / 10) % 10;
-        //     StringResult += (DataLookline.RESULT / 1) % 10;
-        //     String State = "";
-        //   if(DataLookline.state){State ="1" + String(DataLookline.Mode);}else{State = "0" + String(DataLookline.Mode);}
-        //   String sentData = id + "04" + "18" + StringPlan + StringResult + State;
           esp_err_t result;
             // if(MeshConfig.dataVersion == 3){  result = esp_now_send(MeshConfig.BrokerAddress, (uint8_t *) &DataLookline, sizeof(DataLookline));}
             // if(MeshConfig.dataVersion == 0){  result = esp_now_send(MeshConfig.BrokerAddress, (const uint8_t *)sentData.c_str(), sentData.length());}
@@ -1070,7 +1090,9 @@ void TskApp(void *pvParameter)
     for (;;)
     {
         if(MeshConfig.dataVersion == 4){
+            #ifdef USE__VEHICLE
             VehicleLoop();
+            #endif//USE__VEHICLE
         }   
 
         vTaskDelay(100 / portTICK_PERIOD_MS);
@@ -1219,6 +1241,7 @@ void TaskWifiMQTT(void *pvParameter)
                 doc["loraEnable"] = MeshConfig.LoRaEnable;
                 doc["runTime"] = millis() / 1000;
                 doc["resetCounter"] = resetcounter;
+                doc["lightStatus"] = LedState ? "on" : "off";
                 String boardInfo;
                 serializeJson(doc, boardInfo);
                 mainwebInterface.SendMessageToClient(boardInfo);
@@ -1259,7 +1282,7 @@ void setup()
         Serial.println("wait Serial Port");
     }
     #else
-        waitSerialUSB();
+        // waitSerialUSB();
     #endif//ESP32
 
     Serial.println("===== Start System =====");
@@ -1271,18 +1294,22 @@ void setup()
     if(MeshConfig.role == "Broker"){
         // loadDataMapping();
     }
-
+    if(MeshConfig.debug) Serial.println("Init SPI");
     initializeSPI();
-
-    initializeSDCard();
+    if(MeshConfig.debug) Serial.println("Init SDcard");
+    if (!initializeSDCard()) {
+        Serial.println("❌  Failed to initialize SD card.");
+    } 
 
     #ifdef USE_Modbus
+    if(MeshConfig.debug) Serial.println("Init Modbus");
         initializeModbus();
     #endif//USE_Modbus
 
     delay(1000);
+    if(MeshConfig.debug) Serial.println("Init MQTT");
     MQTTwifiConfig.setup();// read MQTT & WiFi config
-
+    if(MeshConfig.debug) Serial.println("Init Wifi");
     initializeWifi();
     
     if (!MeshConfig.MeshEnable){
@@ -1295,6 +1322,7 @@ void setup()
     }
 
     if (MeshConfig.MeshEnable) {
+        if (MeshConfig.debug) Serial.println("Init Mesh");
         esp_wifi_set_promiscuous(false);
         current_wifi_interface = WIFI_IF_STA; // Sử dụng giao diện Wi-Fi Station
         //Set device in STA mode to begin with
@@ -1349,8 +1377,10 @@ void setup()
         #endif//ESP32
 
     }
-    
-
+    #ifdef USE_TCP
+    LoadTCPConfig();
+    #endif//USE_TCP
+    if (MeshConfig.debug) Serial.println("Init Hardware Driver");
     if(SETUP_BUTTON < 0){
         Serial.println("⚠️    SETUP_BUTTON pin not set");
         SETUP_BUTTON = 0; // Set to 0 to disable button functionality
@@ -1359,7 +1389,10 @@ void setup()
     pinMode(SETUP_BUTTON, INPUT_PULLUP);
     LedState = false; // Initialize LED state
     if(MeshConfig.dataVersion == 4){
+        #ifdef USE_VEHICLE
         VehicleSetup();
+        #endif//USE_VEHICLE
+        Led_setup();
         if(MeshConfig.debug)Serial.println("  Using external RGB LED");
         Led_setColor(0x000000); // Set LED to off
         delay(100);
@@ -1448,6 +1481,10 @@ void loop()
             jsonDoc.clear();
         }
     }
+    
+    #ifdef USE_TCP
+    TcpLoop();
+    #endif//USE_TCP
 
     MQTTwifiConfig.loop();
     // MainLoop();

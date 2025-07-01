@@ -1,3 +1,5 @@
+#define USE_AUDIO
+#ifdef USE_AUDIO
 #include "./AudioFunc.h"
 
 #include "Arduino.h"
@@ -293,3 +295,4 @@ void audio_lasthost(const char *info){  //stream URL played
 void audio_eof_speech(const char *info){
     Serial.print("eof_speech  ");Serial.println(info);
 }
+#endif // USE_AUDIO

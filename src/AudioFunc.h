@@ -1,3 +1,5 @@
+#ifdef USE_AUDIO
+
 #ifndef AUDIOFUNC_H
 #define AUDIOFUNC_H
 
@@ -16,3 +18,4 @@ class AudioCmd{
 };
 
 #endif // AUDIOFUNC_H
+#endif // USE_AUDIO

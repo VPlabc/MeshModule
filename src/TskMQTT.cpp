@@ -204,10 +204,10 @@ void connectToWifi() {
 #define RTC_Onl
 #include "RTC_Online.h"
 RTCTimeOnline rtcOnline;
-
+#ifdef USE_AUDIO
   #include "AudioFunc.h"
   AudioCmd MQTTaudioCmnd;
-
+#endif // USE_AUDIO
 // Wrapper for AsyncMqttClient onMessage
 void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total) {
     Serial.println("Publish received.");
@@ -225,9 +225,9 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
     Serial.println(index);
     Serial.print("  total: ");
     Serial.println(total);
-
+#ifdef USE_AUDIO
     MQTTaudioCmnd.audioCmnd(payload);
-
+#endif// USE_AUDIO
     // Forward message as before
     mqttClient.publish(mqttTopicPub.c_str(), mqttQos, mqttRetain, payload);    // Parse JSON
 

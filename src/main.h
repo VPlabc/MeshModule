@@ -5,9 +5,11 @@
 // #define USE_OTA // Enable Over-The-Air updates
 
 #define USE_VEHICLE
+#define USE_AUDIO // Enable Audio functionality
 #define TCP_ETH
 #define USE_SD
 #define USE_LITTLEFS // Ensure LittleFS is used
+// #define USE_TCP
 // #define ESP32_RISCV
 
 #define USE_SERIAL2 // Ensure Serial2 is used
@@ -96,7 +98,7 @@ extern int8_t RST_PIN;
 extern int8_t INIT_PIN;
 extern int8_t Ser_2RX;
 extern int8_t Ser_2TX;
-
+extern int32_t TCP_PORT;
 
 // #ifdef Module_10O4I
 // #include "Adafruit_MCP23008.h"

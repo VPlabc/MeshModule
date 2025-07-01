@@ -568,6 +568,7 @@
                 <svg class="bi" width="20" height="20"><use xlink:href="#reload_icon"></use></svg>
                 Reset
             </button>
+            <p id="resetEspResponse"> </p>
     </nav>
     
     <div id="mappingData" class="tab-content" style=" margin-left: 10px;">
@@ -659,7 +660,6 @@
             </form>
         </div>
         <button type="button" onclick="ResetRom()" style="background:#ff9800;color:white;padding:6px 18px;border:none;border-radius:4px;cursor:pointer;"><svg class="bi" width="20" height="20"><use xlink:href="#reload_icon"></use></svg>ResetRom</button>
-        <p id="resetEspResponse"> </p>
     </div>
     
     <div id="loraRYConfig" class="tab-content" style=" margin-left: 10px;">
@@ -986,9 +986,16 @@
                 </div>
                 <div id="nodeDashboard" style="display: flex; flex-wrap: wrap; gap: 20px;">
                 </div>
+                <!-- LED Status Indicator -->
+                <div id="ledStatusCard" style="margin-top: 24px;">
+                    <div style="font-size:15px; color:#555; margin-bottom:8px;">LED Status</div>
+                    <div id="ledStatusIndicator" style="width:32px;height:32px;border-radius:50%;background:#888;display:inline-block;border:2px solid #bbb;"></div>
+                    <span id="ledStatusText" style="margin-left:12px;font-size:16px;color:#555;">Unknown</span>
+                </div>
             </div>
         </div>
     </div>
+    
 
     <div id="meshConfig" class="tab-content" style=" margin-left: 10px;">
         <div style="display: flex; gap: 20px;">
@@ -1114,6 +1121,74 @@
                 <label for="password" style="display: inline-block; width: 150px;">Password:</label>
                 <input type="password" id="password" name="password" placeholder="Enter Password" style="width: 200px;">
             </div>
+            <h2>TCP Setting</h2>
+            <div style="margin-bottom: 10px;">
+                <label for="tcpEnable" style="display: inline-block; width: 150px;">TCP Enable:</label>
+                <input type="checkbox" id="tcpEnable" name="tcpEnable">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="tcpMode" style="display: inline-block; width: 150px;">TCP Mode:</label>
+                <select id="tcpMode" name="tcpMode" style="width: 200px;" onchange="onTcpModeChange()">
+                    <option value = 1>Server</option>
+                    <option value = 0>Client</option>
+                </select>
+            </div>
+            <div id="tcpIpDiv" style="margin-bottom: 10px;">
+                <label for="tcpIp" style="display: inline-block; width: 150px;">Server IP:</label>
+                <input type="text" id="tcpIp" name="tcpIp" placeholder="Enter Server IP" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="tcpPort" style="display: inline-block; width: 150px;">TCP Port:</label>
+                <input type="number" id="tcpPort" name="tcpPort" placeholder="Enter TCP Port" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <button type="button" onclick="saveTcpConfig()">Save TCP Setting</button>
+                <button type="button" onclick="loadTcpConfig()">Load TCP Setting</button>
+                <p id="responseMessageTcp" style="margin-top: 20px; color: green;"></p>
+            </div>
+            <script>
+                function onTcpModeChange() {
+                    var mode = document.getElementById('tcpMode').value;
+                    document.getElementById('tcpIpDiv').style.display = (mode === 'client') ? 'block' : 'none';
+                }
+                function loadTcpConfig() {
+                    fetch('/load-tcp-config')
+                        .then(r => r.json())
+                        .then(cfg => {
+                            document.getElementById('tcpEnable').checked = cfg.tcpEnable || false;
+                            document.getElementById('tcpMode').value = cfg.tcpMode || 1;
+                            document.getElementById('tcpIp').value = cfg.tcpIp || '';
+                            document.getElementById('tcpPort').value = cfg.tcpPort || '';
+                            onTcpModeChange();
+                            document.getElementById('responseMessageTcp').textContent = 'Loaded!';
+                            setTimeout(()=>{document.getElementById('responseMessageTcp').textContent='';}, 1200);
+                        })
+                        .catch(() => {
+                            document.getElementById('responseMessageTcp').textContent = 'Load failed!';
+                        });
+                }
+                function saveTcpConfig() {
+                    var cfg = {
+                        tcpEnable: document.getElementById('tcpEnable').checked,
+                        tcpMode: document.getElementById('tcpMode').value,
+                        tcpIp: document.getElementById('tcpIp').value,
+                        tcpPort: parseInt(document.getElementById('tcpPort').value)
+                    };
+                    fetch('/save-tcp-config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(cfg)
+                    })
+                    .then(r => r.json())
+                    .then(res => {
+                        document.getElementById('responseMessageTcp').textContent = res.status || 'Saved!';
+                        setTimeout(()=>{document.getElementById('responseMessageTcp').textContent='';}, 1200);
+                    })
+                    .catch(() => {
+                        document.getElementById('responseMessageTcp').textContent = 'Save failed!';
+                    });
+                }
+            </script>
             <h2>MQTT Configuration</h2>
             <div style="margin-bottom: 10px;">
                 <label for="mqttEnable" style="display: inline-block; width: 150px;">Enable MQTT:</label>
@@ -1275,6 +1350,7 @@
         var socketstate = false;
         var updateOnce = true;
         // var gateway = `ws://192.168.1.2/ws`;
+        // var gateway = `ws://10.75.140.29/ws`;
         var gateway = `ws://${window.location.hostname}/ws`;
         var websocket;
         window.addEventListener('load', onLoad);
@@ -1311,6 +1387,8 @@
         window.onload = function () {
             loadPinMapping();
             loadWiFiMQTTConfig();
+            onTcpModeChange();
+            loadTcpConfig();
             loadMeshConfig();
             fetchFileList();
             try {
@@ -1359,11 +1437,33 @@
                         document.getElementById('resetEspResponse').textContent = data.status;
                     } else if (data.error) {
                         document.getElementById('resetEspResponse').textContent = 'Error: ' + data.error;
+                    } else if (data.lightStatus){
+                        console.log('LED status received:', data.lightStatus);
+                        updateLedStatus(data.lightStatus);
                     }
                 }
             }
         };
-            
+        // Listen for LED status from WebSocket and update indicator
+        function updateLedStatus(state) {
+            var led = document.getElementById('ledStatusIndicator');
+            var text = document.getElementById('ledStatusText');
+            if (!led || !text) return;
+            if (state === true || state === 1 || state === "on" || state === "ON") {
+                led.style.background = "#4caf50";
+                text.textContent = "ON";
+                text.style.color = "#4caf50";
+            } else if (state === false || state === 0 || state === "off" || state === "OFF") {
+                led.style.background = "#888";
+                text.textContent = "OFF";
+                text.style.color = "#888";
+            } else {
+                led.style.background = "#bbb";
+                text.textContent = "Unknown";
+                text.style.color = "#bbb";
+            }
+        }
+    
         // Update both text and icon color
         function updateSocketStatus(connected) {
             let icon = document.getElementById('socketStatusSvg');

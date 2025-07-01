@@ -374,7 +374,46 @@ void WebinterFace::setupWebConfig() {
         }
     });
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////// Oin Mapping //////////////////////////////////////////////////
+/////////////////////////////////////////// TCP Setting //////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
+// API: Load TCP setting from TCPConfig.json
+server.on("/load-tcp-config", HTTP_GET, [](AsyncWebServerRequest *request) {
+    if (LittleFS.exists("/TCPConfig.json")) {
+        File file = LittleFS.open("/TCPConfig.json", "r");
+        if (file) {
+            AsyncWebServerResponse *response = request->beginResponse("application/json", file.size(),
+                [file](uint8_t *buffer, size_t maxLen, size_t alreadySent) mutable -> size_t {
+                    file.seek(alreadySent, SeekSet);
+                    return file.read(buffer, maxLen);
+                }
+            );
+            response->addHeader("Content-Type", "application/json");
+            request->send(response);
+            file.close();
+        } else {
+            request->send(500, "application/json", "{\"error\":\"❌ Failed to open TCPConfig.json\"}");
+        }
+    } else {
+        request->send(404, "application/json", "{\"error\":\"❌ TCPConfig.json not found\"}");
+    }
+});
+
+// API: Save TCP setting to TCPConfig.json
+server.on("/save-tcp-config", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
+[](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+    File configFile = LittleFS.open("/TCPConfig.json", index == 0 ? "w" : "a");
+    if (!configFile) {
+        request->send(500, "application/json", "{\"error\":\"❌ Failed to save TCP configuration\"}");
+        return;
+    }
+    configFile.write(data, len);
+    configFile.close();
+    if (index + len == total) {
+        request->send(200, "application/json", "{\"status\":\"✅ TCP configuration saved\"}");
+    }
+});
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////// Pin Mapping //////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // save-data-viewer

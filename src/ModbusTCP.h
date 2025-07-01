@@ -1,4 +1,4 @@
-
+#ifdef USE_MODBUS_TCP
 #ifdef ESP8266
  #include <ESP8266WiFi.h>
 #else
@@ -109,3 +109,4 @@ void TCP_loop(bool role,int IPAddr1,int IPAddr2,int IPAddr3,int IPAddr4) {
   ModBus.task();                      // Common local Modbus task
   delay(10);                     // Polling interval
 }
+#endif //USE_MODBUS_TCP
