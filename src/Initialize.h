@@ -1,21 +1,35 @@
 #include <Arduino.h>
-
+bool SPI_Initialized = false;
 void initializeSPI() {
   if(SD_SCK_PIN == -1 && SD_MOSI_PIN == -1 && SD_MISO_PIN == -1){
         SPI.begin(SCK_PIN, MISO_PIN, MOSI_PIN); // SCK, MISO, MOSI
+        if(MeshConfig.debug) Serial.println("✅   SPI initialized with SCK_PIN, MISO_PIN, MOSI_PIN");
+        if(MeshConfig.debug) Serial.println("⚠️   SD_SCK_PIN, SD_MOSI_PIN, SD_MISO_PIN not set");
+        if(MeshConfig.debug) Serial.println(" SCK_PIN: " + String(SCK_PIN) + " | MISO_PIN: " + String(MISO_PIN) + " | MOSI_PIN: " + String(MOSI_PIN));
+        SPI_Initialized = true;
   }else{
         SPI.begin(SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN); // SCK, MISO, MOSI
-    }
+        if(MeshConfig.debug) Serial.println(" SD_SCK_PIN: " + String(SD_SCK_PIN) + " | SD_MISO_PIN: " + String(SD_MISO_PIN) + " | SD_MOSI_PIN: " + String(SD_MOSI_PIN));
+        if(MeshConfig.debug) Serial.println("✅   SPI initialized with SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN");
+  }
 }
 
 
-void initializeSDCard() {
+bool initializeSDCard() {
 #ifdef USE_SD
-  if (!SD.begin(SD_CS_PIN, SPI, 400000)) { // 4MHz SPI frequency
-    Serial.println("\n❌ SD card failed to initialize! ❌");
+  if (SD_CS_PIN == -1 && SPI_Initialized == false){
+    Serial.println("⚠️   SD_CS_PIN not set");
     Serial.println((" CS Pin: " + String(SD_CS_PIN)));
-  } else {
-    Serial.println("\n✅   SD Card initialized.  ✅");
+    return false; // SD_CS_PIN not set, cannot initialize SD card
+  } else if (SD_CS_PIN > 0 && SPI_Initialized == true){
+    Serial.println((" CS Pin: " + String(SD_CS_PIN)));
+    if (!SD.begin(SD_CS_PIN, SPI)) { // 4MHz SPI frequency
+        Serial.println("\n❌ SD card failed to initialize! ❌");
+        return false; // SD card initialization failed
+    } else {
+        Serial.println("\n✅   SD Card initialized.  ✅");
+        return true; // SD card initialized successfully
+    }
   }
 #endif//USE_SD
 }

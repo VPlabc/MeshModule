@@ -302,7 +302,7 @@ void loadConfig() {
     MeshConfig.macSlaves = doc["macSlaves"].as<JsonArray>();
     MeshConfig.LoRaEnable = doc["loraEnb"] | false;
     MeshConfig.BuzzEnable = doc["buzzEnb"] | false; // Default Buzz disabled
-    MeshConfig.MeshEnable = doc["meshEnable"] | true; // Mặc định bật Mesh
+    MeshConfig.MeshEnable = doc["meshEnable"] | false; // Mặc định bật Mesh
     file.close();
     set_Pinout(MeshConfig.boardModel);
     if (MeshConfig.debug) Serial.println("Config loaded.");

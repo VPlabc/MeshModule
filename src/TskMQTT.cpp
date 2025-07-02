@@ -46,7 +46,7 @@ String WifiMqttConfig::loadWifiMqttConfig(bool debug, fs::FS &FileSystem) {
         // Nếu file không tồn tại, tạo file với cấu hình mặc định
         DynamicJsonDocument doc(1024);
         doc["mqttEnable"] = true;
-        doc["mqttHost"] = "broker.hivemq.com";
+        doc["mqttHost"] = "test.mosquitto.org";
         doc["mqttPort"] = 1883;
         doc["mqttUser"] = "username";
         doc["mqttPass"] = "password";
@@ -54,7 +54,7 @@ String WifiMqttConfig::loadWifiMqttConfig(bool debug, fs::FS &FileSystem) {
         doc["ssid"] = "I-Soft";
         doc["pass"] = "i-soft@2023";
         doc["conId"] = "b8e54d33-b34a-45ab-b76f-62c8a9abc6c4";
-        doc["topicPush"] = "test/topic";
+        doc["topicPush"] = "test/topic/pub"; // Default Publish Topic
         doc["topicSub"] = "test/topic/sub";
         doc["mqttKeepAlive"] = 60; // Default Keep Alive
         doc["mqttCleanSession"] = true; // Default Clean Session
@@ -372,7 +372,7 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
             configFile.close();
 
             mqttEnable = doc["mqttEnable"] | true;
-            mqttHost = doc["mqttHost"] | "broker.hivemq.com";
+            mqttHost = doc["mqttHost"] | "test.mosquitto.org";
             mqttPort = doc["mqttPort"] | 1883;
             mqttUser = doc["mqttUser"] | "";
             mqttPass = doc["mqttPass"] | "";
@@ -380,8 +380,8 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
             ssid = doc["ssid"] | "I-Soft";
             pass = doc["password"] | "i-soft@2023";
             conId = doc["conId"] | "b8e54d33-b34a-45ab-b76f-62c8a9abc6c4";
-            mqttTopicPub = doc["topicPush"].as<String>();
-            mqttTopicSub = doc["topicSub"].as<String>();
+            mqttTopicPub = doc["topicPush"].as<String>() | "i-Soft/push";
+            mqttTopicSub = doc["topicSub"].as<String>() | "i-Soft/sub";
             mqttKeepAlive = doc["mqttKeepAlive"] | 60; // Default Keep Alive
             mqttCleanSession = doc["mqttCleanSession"] | true; // Default Clean Session
             mqttQos = doc["mqttQos"] | 1; // Default QoS
@@ -398,7 +398,7 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
         // Nếu file không tồn tại, tạo file với cấu hình mặc định
         DynamicJsonDocument doc(1024);
         doc["mqttEnable"] = true;
-        doc["mqttHost"] = "broker.hivemq.com";
+        doc["mqttHost"] = "test.mosquitto.org";
         doc["mqttPort"] = 1883;
         doc["mqttUser"] = "";
         doc["mqttPass"] = "";
@@ -406,7 +406,7 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
         doc["ssid"] = "I-Soft";
         doc["password"] = "i-soft@2023";
         doc["conId"] = "b8e54d33-b34a-45ab-b76f-62c8a9abc6c4";
-        doc["mqttTopic"] = "test/topic";
+        doc["topicPush"] = "test/topic/pub"; // Default Publish Topic
         doc["mqttTopicSub"] = "test/topic/sub";
         doc["mqttKeepAlive"] = 60; // Default Keep Alive
         doc["mqttCleanSession"] = true; // Default Clean Session
