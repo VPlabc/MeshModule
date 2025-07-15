@@ -42,7 +42,7 @@ String WifiMqttConfig::loadWifiMqttConfig(bool debug, fs::FS &FileSystem) {
         // Nếu file không tồn tại, tạo file với cấu hình mặc định
         DynamicJsonDocument doc(1024);
         doc["mqttEnable"] = true;
-        doc["mqttHost"] = "broker.hivemq.com";
+        doc["mqttHost"] = "test.mosquitto.org";
         doc["mqttPort"] = 1883;
         doc["mqttUser"] = "username";
         doc["mqttPass"] = "password";
@@ -366,7 +366,7 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
             configFile.close();
 
             mqttEnable = doc["mqttEnable"] | true;
-            mqttHost = doc["mqttHost"] | "broker.hivemq.com";
+            mqttHost = doc["mqttHost"] | "test.mosquitto.org";
             mqttPort = doc["mqttPort"] | 1883;
             mqttUser = doc["mqttUser"] | "";
             mqttPass = doc["mqttPass"] | "";
@@ -392,7 +392,7 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
         // Nếu file không tồn tại, tạo file với cấu hình mặc định
         DynamicJsonDocument doc(1024);
         doc["mqttEnable"] = true;
-        doc["mqttHost"] = "broker.hivemq.com";
+        doc["mqttHost"] = "test.mosquitto.org";
         doc["mqttPort"] = 1883;
         doc["mqttUser"] = "";
         doc["mqttPass"] = "";

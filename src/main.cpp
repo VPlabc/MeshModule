@@ -2,7 +2,8 @@
 #include <ArduinoJson.h>
 #include <esp_spiram.h>
 #include <Arduino.h>
-#ifndef USE_DoorLocker
+#define USE_PSRAM
+// #ifndef USE_DoorLocker
 // int timezone = 7;
 
 //#define TCP_ETH
@@ -52,6 +53,8 @@ TaskHandle_t TaskEthernet;
 
 TaskHandle_t TaskApp;
 
+#include "LMDMain.h"
+LMDmain mainLMD;
 
 #include "WebInterface.h"
 WebinterFace mainwebInterface;
@@ -150,6 +153,7 @@ void ModbusLoop(int Timeout)
 #endif//USE_Modbus
 
 #include "Initialize.h"
+
 
 void waitSerialUSB(unsigned long timeoutMs = 10000) {
     unsigned long start = millis();
@@ -250,11 +254,19 @@ void loadConfig() {
         MeshConfig.debug = true;  // Default debug enabled
         MeshConfig.LoRaEnable = false; //Default LoRa disabled
         MeshConfig.BuzzEnable = false; //Default Buzz disabled
+            #ifdef USE_PSRAM
+    void* psramPtr = ps_malloc(512);
+    DynamicJsonDocument doc(psramPtr ? 512 : 512);
+        if (!psramPtr) {
+            if (MeshConfig.debug) Serial.println("Failed to allocate PSRAM for DynamicJsonDocument, falling back to heap.");
+        }
+    #else
         DynamicJsonDocument doc(512);
+    #endif//USE_PSRAM
         MeshConfig.macSlaves = doc.createNestedArray("macSlaves");
         MeshConfig.dataVersion = 0; // Default dataVersion
-        MeshConfig.boardModel = 1;
-        MeshConfig.MeshEnable = true; // Mặc định bật Mesh
+        MeshConfig.boardModel = 7;//coustomboard //1;
+        MeshConfig.MeshEnable = false; // Mặc định bật Mesh
         saveConfig(); // Save the configuration
         return;
     }
@@ -269,7 +281,15 @@ void loadConfig() {
     //     Serial.println(line);
     // }
     // file.seek(0); // Đặt lại con trỏ file về đầu để deserializeJson phía dưới vẫn hoạt động
-    DynamicJsonDocument doc(512);
+    #ifdef USE_PSRAM
+        void* psramPtr = ps_malloc(512);
+        DynamicJsonDocument doc(psramPtr ? 512 : 512);
+        if (!psramPtr) {
+            if (MeshConfig.debug) Serial.println("Failed to allocate PSRAM for DynamicJsonDocument, falling back to heap.");
+        }
+    #else
+        DynamicJsonDocument doc(512);
+    #endif//USE_PSRAM
     DeserializationError error = deserializeJson(doc, file);
     if (error) {
         Serial.println("Failed to parse config file.");
@@ -302,7 +322,7 @@ void loadConfig() {
     MeshConfig.macSlaves = doc["macSlaves"].as<JsonArray>();
     MeshConfig.LoRaEnable = doc["loraEnb"] | false;
     MeshConfig.BuzzEnable = doc["buzzEnb"] | false; // Default Buzz disabled
-    MeshConfig.MeshEnable = doc["meshEnable"] | true; // Mặc định bật Mesh
+    MeshConfig.MeshEnable = doc["meshEnable"] | false; // Mặc định bật Mesh
     file.close();
     set_Pinout(MeshConfig.boardModel);
     if (MeshConfig.debug) Serial.println("Config loaded.");
@@ -320,8 +340,15 @@ void saveConfig() {
         if (MeshConfig.debug) Serial.println("❌  Failed to open config file for writing.");
         return;
     }
-
-    DynamicJsonDocument doc(512);
+    #ifdef USE_PSRAM
+        void* psramPtr = ps_malloc(512);
+        DynamicJsonDocument doc(psramPtr ? 512 : 512);
+        if (!psramPtr) {
+            if (MeshConfig.debug) Serial.println("Failed to allocate PSRAM for DynamicJsonDocument, falling back to heap.");
+        }
+    #else
+        DynamicJsonDocument doc(512);
+    #endif//USE_PSRAM
     doc["BrokerAddress"] = convertBrokerAddressToString(MeshConfig.BrokerAddress);
     doc["wifiChannel"] = MeshConfig.wifiChannel;
     doc["id"] = MeshConfig.id;
@@ -375,7 +402,15 @@ void processSerialInput() {
         char incomingChar = Serial.read();
         if (incomingChar == '\n') {
             inputBuffer[inputLen] = '\0'; // Null-terminate
-            DynamicJsonDocument doc(512);
+            #ifdef USE_PSRAM
+                void* psramPtr = ps_malloc(512);
+                DynamicJsonDocument doc(psramPtr ? 512 : 512);
+                if (!psramPtr) {
+                    if (MeshConfig.debug) Serial.println("Failed to allocate PSRAM for DynamicJsonDocument, falling back to heap.");
+                }
+            #else
+                DynamicJsonDocument doc(512);
+            #endif//USE_PSRAM
             DeserializationError error = deserializeJson(doc, inputBuffer);
             if (error) {
                 if (MeshConfig.debug) Serial.println("Failed to parse JSON input.");
@@ -485,8 +520,16 @@ void printMacList() {
         if (MeshConfig.debug) Serial.println("Failed to open maclist.json for reading.");
         return;
     }
+    #ifdef USE_PSRAM
+        void* psramPtr = ps_malloc(1024);
+        DynamicJsonDocument doc(psramPtr ? 1024 : 1024);
+        if (!psramPtr) {
+            if (MeshConfig.debug) Serial.println("Failed to allocate PSRAM for DynamicJsonDocument, falling back to heap.");
+        }
+    #else
+        DynamicJsonDocument doc(1024);
+    #endif//USE_PSRAM
 
-    DynamicJsonDocument doc(1024);
     DeserializationError error = deserializeJson(doc, file);
     file.close();
 
@@ -510,7 +553,15 @@ void printMacList() {
 // Function to save MAC address and ID to maclist.json
 void saveMacToMacList(const uint8_t *macAddr, int id) {
     File file = FileSystem.open(MACLIST_FILE, "r");
-    DynamicJsonDocument doc(1024);
+    #ifdef USE_PSRAM
+        void* psramPtr = ps_malloc(1024);
+        DynamicJsonDocument doc(psramPtr ? 1024 : 1024);
+        if (!psramPtr) {
+            if (MeshConfig.debug) Serial.println("Failed to allocate PSRAM for DynamicJsonDocument, falling back to heap.");
+        }
+    #else
+        DynamicJsonDocument doc(1024);
+    #endif//USE_PSRAM
 
     if (file) {
         DeserializationError error = deserializeJson(doc, file);
@@ -627,6 +678,10 @@ void receiveCallback(const esp_now_recv_info *recvInfo, const uint8_t *data, int
 }
 #else//ESP32_RISCV
 #include <queue>
+
+#ifndef USE_Vehicle
+#include "LEDRGB.h"
+#endif//USE_Vehicle
 
 std::queue<dataPacket> dataQueue;
 
@@ -759,7 +814,7 @@ void processQueue() {
                 }
             }
         }
-    #endif//USE_Modbus
+        #endif//USE_Modbus
     }
 }
 
@@ -1051,11 +1106,11 @@ void TskEthernet(void *pvParameter)
         #ifdef USE_W5500
         W5500loop();
         #endif//USE_W5500
-        MQTTwifiConfig.loop();
+        // MQTTwifiConfig.loop();
         static long lastReceiveTime = millis();
         if (millis() - lastReceiveTime >= 5000) {
             lastReceiveTime = millis();
-            if (MeshConfig.debug) Serial.println("TskEthernet MQTTwifiConfig.loop()  is running...");
+            // if (MeshConfig.debug) Serial.println("TskEthernet MQTTwifiConfig.loop()  is running...");
         }
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
@@ -1070,7 +1125,9 @@ void TskApp(void *pvParameter)
     for (;;)
     {
         if(MeshConfig.dataVersion == 4){
+            #ifdef USE_Vehicle
             VehicleLoop();
+            #endif//USE_Vehicle
         }   
 
         vTaskDelay(100 / portTICK_PERIOD_MS);
@@ -1231,11 +1288,15 @@ void TaskWifiMQTT(void *pvParameter)
 }
 
 
+
+
 bool EthernetAvilable = false;
 int n_elements = 20000;
 unsigned char * acc_data_all;
 
 #include "PSRam.h"
+
+
 //////////////////////////////////////////////////////////////////////////////////////////////////
 void setup()
 {
@@ -1360,7 +1421,10 @@ void setup()
     pinMode(SETUP_BUTTON, INPUT_PULLUP);
     LedState = false; // Initialize LED state
     if(MeshConfig.dataVersion == 4){
+        #ifdef USE_Vehicle
         VehicleSetup();
+        #endif//USE_Vehicle
+        Led_setup();
         if(MeshConfig.debug)Serial.println("  Using external RGB LED");
         Led_setColor(0x000000); // Set LED to off
         delay(100);
@@ -1375,13 +1439,18 @@ void setup()
         Led_setColor(0x00ff00); // Set LED to green
         delay(100);
     }else{
-        if(MeshConfig.debug)Serial.println("  Using external LED");
-        // use the built in LED
-        pinMode(LED_STT, OUTPUT);
-        digitalWrite(LED_STT, HIGH);delay(100);
-        digitalWrite(LED_STT, LOW);delay(100);
-        digitalWrite(LED_STT, HIGH);delay(100);
-        digitalWrite(LED_STT, LOW);delay(100);
+        if(LED_STT < 0){
+            Serial.println("⚠️    LED_STT pin not set");
+            LED_STT = 2; // Set to 2 to use the built-in LED
+        }else{
+            if(MeshConfig.debug)Serial.println("  Using external LED");
+            // use the built in LED
+            pinMode(LED_STT, OUTPUT);
+            digitalWrite(LED_STT, HIGH);delay(100);
+            digitalWrite(LED_STT, LOW);delay(100);
+            digitalWrite(LED_STT, HIGH);delay(100);
+            digitalWrite(LED_STT, LOW);delay(100);
+        }
     }
 
     #ifdef USE_Modbus
@@ -1407,7 +1476,7 @@ void setup()
     if (MeshConfig.debug) Serial.println("PSRAM available: " + String(psramFound() ? "Yes" : "No"));
     if (psramInit()) {
         if (MeshConfig.debug) Serial.println("✅  PSRAM initialized successfully.");
-        acc_data_all = (unsigned char *) ps_malloc (n_elements * sizeof (unsigned char)); 
+        // acc_data_all = (unsigned char *) ps_malloc (n_elements * sizeof (unsigned char)); 
     } else {
         if (MeshConfig.debug) Serial.println("❌  PSRAM initialization failed or not available.");
     }
@@ -1638,157 +1707,158 @@ else
 }
 // delay(3000);
 }
-#else
-#include "Project/DoorLocker.h"
-#define DoorUpState     15
-#define DoorStopState   16
-#define DoorDownState   17
-bool debug = true; // Set to true for debugging output
-#include <WiFi.h>
-#include <PubSubClient.h>
 
-const char* mqtt_server = "test.mosquitto.org"; // Replace with your MQTT broker address
-const char* mqtt_user = "";
-const char* mqtt_password = "";
-const char* mqtt_topic = "door/state";
+// #else
+// #include "Project/DoorLocker.h"
+// #define DoorUpState     15
+// #define DoorStopState   16
+// #define DoorDownState   17
+// bool debug = true; // Set to true for debugging output
+// #include <WiFi.h>
+// #include <PubSubClient.h>
 
-WiFiClient espClient;
-PubSubClient client(espClient);
+// const char* mqtt_server = "test.mosquitto.org"; // Replace with your MQTT broker address
+// const char* mqtt_user = "";
+// const char* mqtt_password = "";
+// const char* mqtt_topic = "door/state";
 
-void publishDoorState() {
-    String state = String(DoorState ? "Open" : "Closed");
-    client.publish(mqtt_topic, state.c_str(), true); // retain = true
-}
+// WiFiClient espClient;
+// PubSubClient client(espClient);
 
-void reconnect() {
-    // Loop until we're reconnected
-    while (!client.connected()) {
-        if (client.connect("DoorLockerClient")) {
-            client.subscribe(mqtt_topic);
-        } else {
-            delay(2000);
-        }
-    }
-}
+// void publishDoorState() {
+//     String state = String(DoorState ? "Open" : "Closed");
+//     client.publish(mqtt_topic, state.c_str(), true); // retain = true
+// }
 
-void mqttCallback(char* topic, byte* payload, unsigned int length) {
-    // Optionally handle incoming messages if needed
-    const char* message = (const char*)payload;
-    if (debug) {
-        Serial.print("Message arrived [");
-        Serial.print(topic);
-        Serial.print("]: ");
-        for (unsigned int i = 0; i < length; i++) {
-            Serial.print((char)payload[i]);
-        }
-        Serial.println();
-    }
-    //Door ID with state message for update client state
+// void reconnect() {
+//     // Loop until we're reconnected
+//     while (!client.connected()) {
+//         if (client.connect("DoorLockerClient")) {
+//             client.subscribe(mqtt_topic);
+//         } else {
+//             delay(2000);
+//         }
+//     }
+// }
+
+// void mqttCallback(char* topic, byte* payload, unsigned int length) {
+//     // Optionally handle incoming messages if needed
+//     const char* message = (const char*)payload;
+//     if (debug) {
+//         Serial.print("Message arrived [");
+//         Serial.print(topic);
+//         Serial.print("]: ");
+//         for (unsigned int i = 0; i < length; i++) {
+//             Serial.print((char)payload[i]);
+//         }
+//         Serial.println();
+//     }
+//     //Door ID with state message for update client state
     
-}
+// }
 
-void setup_mqtt_wifi() {
-    if(WiFi.status() != WL_CONNECTED) {
-        WiFi.begin(SSID, PASS); // Replace with your WiFi credentials
-        while (WiFi.status() != WL_CONNECTED) {
-            delay(500);
-            Serial.print(".");
-        }
-        Serial.println("Connected to WiFi");
-        Serial.print(" 🌐   IP address: ");
-        Serial.println(WiFi.localIP());
-    } else {
-        Serial.println("Already connected to WiFi");
-        client.setServer(mqtt_server, 1883);
-        client.setCallback(mqttCallback);
-    }
-}
-
-
-void DoorStates(){
-    if (DoorState == 0) { // Closed
-        if (digitalRead(DoorUpState) == HIGH) {
-            DoorState = 1; // Open
-            Serial.println("Door is now Open");
-        }
-    } else if (DoorState == 1) { // Open
-        if (digitalRead(DoorDownState) == HIGH) {
-            DoorState = 0; // Closed
-            Serial.println("Door is now Closed");
-        } else if (digitalRead(DoorStopState) == HIGH) {
-            DoorState = 2; // Stopped
-            Serial.println("Door is Stopped");
-        }
-    } else if (DoorState == 2) { // Stopped
-        if (digitalRead(DoorUpState) == HIGH) {
-            DoorState = 1; // Open
-            Serial.println("Door is now Open");
-        } else if (digitalRead(DoorDownState) == HIGH) {
-            DoorState = 0; // Closed
-            Serial.println("Door is now Closed");
-        }
-    }
-}
-#include <EEPROM.h>
-long resetcounter = 0;
-void setup() {
-    EEPROM.begin(512);
-    if(EEPROM.readLong(0) == 0xFFFFFFFF || EEPROM.readLong(0) == -1) {
-        EEPROM.writeLong(0, 0);
-        EEPROM.commit();
-    }
-    resetcounter = EEPROM.readLong(0);
-    Serial.begin(115200);
-    setup_mqtt_wifi();
-    DoorSetup();
-    Serial.println("DoorLocker setup completed.");
-    pinMode(DoorUpState, OUTPUT);
-    pinMode(DoorStopState, OUTPUT);
-    pinMode(DoorDownState, OUTPUT);
-    digitalWrite(DoorUpState, LOW);
-    digitalWrite(DoorStopState, LOW);
-    digitalWrite(DoorDownState, LOW);
-    client.setServer(mqtt_server, 1883);
-    client.setCallback(mqttCallback);
-    if (!client.connected()) {
-        reconnect();
-    }
-    if (debug) {
-        Serial.println("DoorLocker initialized with reset counter: " + String(resetcounter));
-    }
-}
-
-void loop() {
-    client.loop();
-
-    DoorLoop();
-    if (!client.connected()) {
-        reconnect();
-    }
-
-    static int lastState = DoorState;
-    if (DoorState != lastState) {
-        publishDoorState();
-        lastState = DoorState;
-    }
-
-    DoorLoop(); // Call the loop function from DoorLocker.h
+// void setup_mqtt_wifi() {
+//     if(WiFi.status() != WL_CONNECTED) {
+//         WiFi.begin(SSID, PASS); // Replace with your WiFi credentials
+//         while (WiFi.status() != WL_CONNECTED) {
+//             delay(500);
+//             Serial.print(".");
+//         }
+//         Serial.println("Connected to WiFi");
+//         Serial.print(" 🌐   IP address: ");
+//         Serial.println(WiFi.localIP());
+//     } else {
+//         Serial.println("Already connected to WiFi");
+//         client.setServer(mqtt_server, 1883);
+//         client.setCallback(mqttCallback);
+//     }
+// }
 
 
-    static long lastLoopTime = millis();
-    if (millis() - lastLoopTime >= 10000) { // Run every second
-        lastLoopTime = millis();
-        Serial.println("\n=================================================");
-        Serial.println("DoorLocker loop running...");
-        Serial.println("  🖥️   Reset Counter: " + String(resetcounter));
-        Serial.println("  🚪   Door state: " + String(DoorState ? "Open" : "Closed"));
-        Serial.println("  💾   Free Heap: " + String(ESP.getFreeHeap() / 1024) + "Kb");
-        Serial.println("  🎞   Free PSRAM: " + String(ESP.getFreePsram() / 1024) + "Kb");
-        Serial.println("  🌡️  Chip : " + String(temperatureRead()) + " °C");
-        Serial.println("=================================================\n");
-        DoorStates();
-    }   
+// void DoorStates(){
+//     if (DoorState == 0) { // Closed
+//         if (digitalRead(DoorUpState) == HIGH) {
+//             DoorState = 1; // Open
+//             Serial.println("Door is now Open");
+//         }
+//     } else if (DoorState == 1) { // Open
+//         if (digitalRead(DoorDownState) == HIGH) {
+//             DoorState = 0; // Closed
+//             Serial.println("Door is now Closed");
+//         } else if (digitalRead(DoorStopState) == HIGH) {
+//             DoorState = 2; // Stopped
+//             Serial.println("Door is Stopped");
+//         }
+//     } else if (DoorState == 2) { // Stopped
+//         if (digitalRead(DoorUpState) == HIGH) {
+//             DoorState = 1; // Open
+//             Serial.println("Door is now Open");
+//         } else if (digitalRead(DoorDownState) == HIGH) {
+//             DoorState = 0; // Closed
+//             Serial.println("Door is now Closed");
+//         }
+//     }
+// }
+// #include <EEPROM.h>
+// long resetcounter = 0;
+// void setup() {
+//     EEPROM.begin(512);
+//     if(EEPROM.readLong(0) == 0xFFFFFFFF || EEPROM.readLong(0) == -1) {
+//         EEPROM.writeLong(0, 0);
+//         EEPROM.commit();
+//     }
+//     resetcounter = EEPROM.readLong(0);
+//     Serial.begin(115200);
+//     setup_mqtt_wifi();
+//     DoorSetup();
+//     Serial.println("DoorLocker setup completed.");
+//     pinMode(DoorUpState, OUTPUT);
+//     pinMode(DoorStopState, OUTPUT);
+//     pinMode(DoorDownState, OUTPUT);
+//     digitalWrite(DoorUpState, LOW);
+//     digitalWrite(DoorStopState, LOW);
+//     digitalWrite(DoorDownState, LOW);
+//     client.setServer(mqtt_server, 1883);
+//     client.setCallback(mqttCallback);
+//     if (!client.connected()) {
+//         reconnect();
+//     }
+//     if (debug) {
+//         Serial.println("DoorLocker initialized with reset counter: " + String(resetcounter));
+//     }
+// }
+
+// void loop() {
+//     client.loop();
+
+//     DoorLoop();
+//     if (!client.connected()) {
+//         reconnect();
+//     }
+
+//     static int lastState = DoorState;
+//     if (DoorState != lastState) {
+//         publishDoorState();
+//         lastState = DoorState;
+//     }
+
+//     DoorLoop(); // Call the loop function from DoorLocker.h
+
+
+//     static long lastLoopTime = millis();
+//     if (millis() - lastLoopTime >= 10000) { // Run every second
+//         lastLoopTime = millis();
+//         Serial.println("\n=================================================");
+//         Serial.println("DoorLocker loop running...");
+//         Serial.println("  🖥️   Reset Counter: " + String(resetcounter));
+//         Serial.println("  🚪   Door state: " + String(DoorState ? "Open" : "Closed"));
+//         Serial.println("  💾   Free Heap: " + String(ESP.getFreeHeap() / 1024) + "Kb");
+//         Serial.println("  🎞   Free PSRAM: " + String(ESP.getFreePsram() / 1024) + "Kb");
+//         Serial.println("  🌡️  Chip : " + String(temperatureRead()) + " °C");
+//         Serial.println("=================================================\n");
+//         DoorStates();
+//     }   
     
-}
-#endif//USE_DoorLoker
+// }
+// #endif//USE_DoorLoker
 //580 - 6-15 chỉ

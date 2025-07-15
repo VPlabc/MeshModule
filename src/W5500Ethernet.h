@@ -1,5 +1,7 @@
 #include <Arduino.h>
-// #define ESP32SC
+#include <ArduinoJson.h>
+#define ESP32SC
+#define USE_PSRAM
 
 #define DEBUG_ETHERNET_WEBSERVER_PORT       Serial
 // Debug Level from 0 to 4
@@ -92,7 +94,15 @@ void W5500setup(int CS_GP,int INT_GP, int SCK_GP, int MISO_GP, int MOSI_GP)
   //ETH.begin( MISO_GPIO, MOSI_GPIO, SCK_GPIO, CS_GPIO, INT_GPIO, SPI_CLOCK_MHZ, ETH_SPI_HOST, mac[millis() % NUMBER_OF_MAC] );
     // Load IP configuration from Ethernet.json
     if (!LittleFS.exists("/Ethernet.json")) {
+      #ifdef USE_PSRAM
+        void* psramPtr = ps_malloc(256);
+        DynamicJsonDocument doc(psramPtr ? 256 : 256);
+        if (!psramPtr) {
+            if (MeshConfig.debug) Serial.println("Failed to allocate PSRAM for DynamicJsonDocument, falling back to heap.");
+        }
+      #else
         DynamicJsonDocument doc(256);
+      #endif//USE_PSRAM
         doc["ip"] = myIP.toString();
         doc["gateway"] = myGW.toString();
         doc["subnet"] = mySN.toString();
@@ -111,7 +121,15 @@ void W5500setup(int CS_GP,int INT_GP, int SCK_GP, int MISO_GP, int MOSI_GP)
             std::unique_ptr<char[]> buf(new char[size + 1]);
             configFile.readBytes(buf.get(), size);
             buf[size] = '\0';
+            #ifdef USE_PSRAM
+            void* psramPtr = ps_malloc(512);
+            DynamicJsonDocument doc(psramPtr ? 512 : 512);
+            if (!psramPtr) {
+                if (MeshConfig.debug) Serial.println("Failed to allocate PSRAM for DynamicJsonDocument, falling back to heap.");
+            }
+            #else
             DynamicJsonDocument doc(512);
+            #endif//USE_PSRAM
             DeserializationError error = deserializeJson(doc, buf.get());
             if (!error) {
                 if (doc.containsKey("ip")) {

@@ -7,6 +7,7 @@ LoRaFunction configLoRa;
 
 //////////////////////////////////////////////////////////////
 #define  USE_OTA
+#define USE_PSRAM
 
 #ifdef USE_OTA
 #include <ESPAsyncWebServer.h>
@@ -17,16 +18,22 @@ LoRaFunction configLoRa;
 Modbus_Prog WebModbusCom;
 
 #include <EEPROM.h>
+#define LMD_SOCKET
+
+#ifdef LMD_SOCKET
+#include "LMDMain.h"
+LMDmain webLMD;
+#endif//LMD_SOCKET
 
 const String localIPURL = "http://192.168.4.1";	 // a string version of the local IP with http, used for redirecting clients to your webpage
 
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
-String mqttHost = "broker.hivemq.com";
+String mqttHost = "test.mosquitto.org";
 int mqttPort = 1883;
-String mqttUser = "username";
-String mqttPass = "password";
+String mqttUser = "";
+String mqttPass = "";
 bool mqttEnable = true;
 
 String wifiMode = "AP";
@@ -158,7 +165,7 @@ String readPasswordFromBinFile(byte Level) {
     return binToPassword(bin);
 }
 ////////////////////////////////////////// Web Socket ///////////////////////////////////////////////////
-
+#define LMD_SOCKET
 void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
     AwsFrameInfo *info = (AwsFrameInfo*)arg;
     if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
@@ -168,7 +175,20 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
     //     notifyClients();
     //   }
         Serial.println("Data Recive:" + String((char*)data));
-        DynamicJsonDocument doc(256);
+        #ifdef LMD_SOCKET
+            webLMD.StringProcess(String((char*)data));
+        #endif//LMD_SOCKET
+
+        #ifdef USE_PSRAM
+            void* psramPtr = ps_malloc(256);
+            DynamicJsonDocument doc(psramPtr ? 256 : 256);
+            // if (!psramPtr) {
+            //     if (MeshConfig.debug) Serial.println("Failed to allocate PSRAM for DynamicJsonDocument, falling back to heap.");
+            // }
+        #else
+            DynamicJsonDocument doc(256);
+        #endif//USE_PSRAM
+
         DeserializationError error = deserializeJson(doc, (char*)data);
         if (!error && doc.containsKey("login")) {
             String user = doc["user"] | "";
@@ -315,7 +335,16 @@ void WebinterFace::setupWebConfig() {
     server.on("/set-initial-passwords", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
     [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
         // String body = String((char*)data).substring(0, len);
-        DynamicJsonDocument doc(512);
+        #ifdef USE_PSRAM
+            void* psramPtr = ps_malloc(512);
+            DynamicJsonDocument doc(psramPtr ? 512 : 512);
+            // if (!psramPtr) {
+            //     if (MeshConfig.debug) Serial.println("Failed to allocate PSRAM for DynamicJsonDocument, falling back to heap.");
+            // }
+        #else
+            DynamicJsonDocument doc(512);  
+        #endif//USE_PSRAM
+
         DeserializationError error = deserializeJson(doc, (char*) data);
         if (error) {
             request->send(400, "application/json", "{\"status\":\"fail\",\"error\":\"Invalid JSON\"}");
@@ -374,7 +403,7 @@ void WebinterFace::setupWebConfig() {
         }
     });
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////// Oin Mapping //////////////////////////////////////////////////
+/////////////////////////////////////////// Pin Mapping //////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // save-data-viewer
@@ -478,8 +507,15 @@ void WebinterFace::setupWebConfig() {
 server.on("/configure-lora", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
 [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
     // String body = String((char*)data).substring(0, len);
-    DynamicJsonDocument doc(1024);
-
+    #ifdef USE_PSRAM
+        void* psramPtr = ps_malloc(1024);
+        DynamicJsonDocument doc(psramPtr ? 1024 : 1024);
+        // if (!psramPtr) {
+        //     if (MeshConfig.debug) Serial.println("Failed to allocate PSRAM for DynamicJsonDocument, falling back to heap.");
+        // }
+    #else
+        DynamicJsonDocument doc(1024);
+    #endif//USE_PSRAM
     DeserializationError error = deserializeJson(doc,(char*) data);
     if (error) {
         request->send(400, "application/json", "{\"error\":\"❌ Invalid JSON\"}");
@@ -606,8 +642,15 @@ server.on("/load-wifi-mqtt-config", HTTP_GET, [](AsyncWebServerRequest *request)
 
 server.on("/save-wifi-mqtt-config", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
 [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-
-    DynamicJsonDocument doc(1024);
+    #ifdef USE_PSRAM
+        void* psramPtr = ps_malloc(1024);
+        DynamicJsonDocument doc(psramPtr ? 1024 : 1024);
+        // if (!psramPtr) {
+        //     if (MeshConfig.debug) Serial.println("Failed to allocate PSRAM for DynamicJsonDocument, falling back to heap.");
+        // }
+    #else
+        DynamicJsonDocument doc(1024);
+    #endif//USE_PSRAM
 
     DeserializationError error = deserializeJson(doc,(char*) data);
     if (error) {
@@ -839,7 +882,15 @@ server.on("/save-wifi-mqtt-config", HTTP_POST, [](AsyncWebServerRequest *request
                 if (request->contentLength() > 0) {
                     percent = ((float)(index + len) / (float)request->contentLength()) * 100.0f;
                 }
-                DynamicJsonDocument doc(128);
+                #ifdef USE_PSRAM
+                    void* psramPtr = ps_malloc(128);
+                    DynamicJsonDocument doc(psramPtr ? 128 : 128);
+                    // if (!psramPtr) {
+                    //     if (MeshConfig.debug) Serial.println("Failed to allocate PSRAM for DynamicJsonDocument, falling back to heap.");
+                    // }
+                #else
+                    DynamicJsonDocument doc(128);
+                #endif//USE_PSRAM
                 doc["upload"] = "progress";
                 doc["filename"] = filename;
                 doc["percent"] = (int)percent;
@@ -874,7 +925,16 @@ server.on("/save-wifi-mqtt-config", HTTP_POST, [](AsyncWebServerRequest *request
                 if (request->contentLength() > 0) {
                     percent = ((float)(index + len) / (float)request->contentLength()) * 100.0f;
                 }
-                DynamicJsonDocument doc(128);
+                #ifdef USE_PSRAM
+                    void* psramPtr = ps_malloc(128);
+                    DynamicJsonDocument doc(psramPtr ? 128 : 128);
+                    // if (!psramPtr) {
+                    //     if (MeshConfig.debug) Serial.println("Failed to allocate PSRAM for DynamicJsonDocument, falling back to heap.");
+                    // }
+                #else
+                    DynamicJsonDocument doc(128);
+                #endif//USE_PSRAM
+
                 doc["upload"] = "progress";
                 doc["filename"] = filename;
                 doc["percent"] = (int)percent;

@@ -1,0 +1,590 @@
+#include <Arduino.h>
+#include "LMDMain.h"
+LMDmain mainLMDS;
+#include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
+#include <ESP32-HUB75-VirtualMatrixPanel_T.hpp>
+#include <LittleFS.h>
+#include <ArduinoJson.h>
+#include <WiFi.h>
+#include <WebServer.h>
+// #include <WebSocketsServer.h>
+#include <ESPAsyncWebServer.h>
+#include <Fonts/FreeSans9pt7b.h>
+#include <Fonts/Picopixel.h>
+#include <Fonts/TomThumb.h>
+#include <Fonts/mythic_5pixels.h>
+#include <Fonts/B_5px.h>
+// #include <Fonts/hud5pt7b.h>
+// #include <Fonts/04B_5px.h>
+
+
+
+#include <Fonts/Tiny3x3a2pt7b.h>
+
+
+
+
+
+TextLine textCoorID[MAX_GROUPS][MAX_LINES_PER_GROUP];// tao mang 2 chieu de luu toa do va id cua tung dong chu trong tung nhom
+int rowsTextInEachShapeFilter[MAX_GROUPS]; // Số dòng thực tế trong mỗi nhóm
+
+
+char textContents[MAX_GROUPS][MAX_LINES_PER_GROUP][MAX_TEXT_LENGTH]; // [nhóm][dòng][ký tự]
+
+
+
+
+// ==== Scan type mapping ====
+#define PANEL_SCAN_TYPE FOUR_SCAN_32PX_HIGH // hoặc FOUR_SCAN_64PX_HIGH tùy panel thực tế
+using MyScanTypeMapping = ScanTypeMapping<PANEL_SCAN_TYPE>;
+
+// ==== Khai báo đối tượng DMA và VirtualPanel ====
+MatrixPanel_I2S_DMA *dma_display = nullptr;
+VirtualMatrixPanel_T<CHAIN_NONE, MyScanTypeMapping>* virtualDisp = nullptr;
+
+// ==== Màu sắc mẫu ====
+uint16_t myBLACK, myWHITE, myRED, myGREEN, myBLUE;
+
+// AsyncWebServer server(80);
+AsyncWebSocket webSocketServer("/ws");
+void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
+void setTextContentAndCoord(int group, int row, int x, int y, int id, const char* content);
+void get_CoordsAndID(JsonArray textInfoArray, TextLine textCoorID[MAX_GROUPS][MAX_LINES_PER_GROUP]);
+void showAllTextLines(TextLine textCoorID[MAX_GROUPS][MAX_LINES_PER_GROUP], char textContents[MAX_GROUPS][MAX_LINES_PER_GROUP][MAX_TEXT_LENGTH]);
+void drawShapeFromType(DynamicJsonDocument dataIn);
+void draw_MSG(DynamicJsonDocument dataIn);
+void setup_web();
+void setup_WS();
+void saveConfig(const DynamicJsonDocument& doc, String filePath = "/CONFIG.json");
+DynamicJsonDocument loadLMDConfig(String filePath = "/CONFIG.json");
+void DrawLine(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1);
+void DrawRect(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1);
+void DrawRound(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1);
+void DrawTriangle(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2);
+void drawTextInShape(DynamicJsonDocument doc);
+void clearMSG(DynamicJsonDocument doc);
+void setup_littleFS();
+void setup_ledPanel();
+
+void mapDataToTextContents( JsonArray arr, char textContents[MAX_GROUPS][MAX_LINES_PER_GROUP][MAX_TEXT_LENGTH]);
+void mapDocToTextContents(const DynamicJsonDocument doc, char textContents[MAX_GROUPS][MAX_LINES_PER_GROUP][MAX_TEXT_LENGTH]);
+
+DynamicJsonDocument createSampleJson() ;
+void DrawLine(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t color = myWHITE) {
+  virtualDisp->drawLine(x0, y0, x1, y1, color);
+  Serial.print("Đã vẽ");
+}
+void DrawRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h,uint16_t color = myWHITE) {
+  virtualDisp->drawRect(x, y, w, h, color);
+}
+void DrawCircle(uint16_t x, uint16_t y, uint16_t r,uint16_t color = myWHITE) {
+  virtualDisp->drawCircle(x, y, r, color);
+}
+void DrawTriangle(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t color = myWHITE) {
+  virtualDisp->drawTriangle(x0, y0, x1, y1, x2, y2, color);
+}
+
+void drawShapeFromType(DynamicJsonDocument dataIn) {
+
+    if (!dataIn.is<JsonArray>() || dataIn.size() < 1) {
+        Serial.println("Dữ liệu JSON không đúng định dạng mảng.");
+        return;
+    }
+
+    JsonArray shapes = dataIn[0];
+    for (JsonVariant shapeObj : shapes) {
+        if (!shapeObj.containsKey("type") || !shapeObj.containsKey("data")) {
+            Serial.println("Bỏ qua hình không hợp lệ!");
+            continue;
+        }
+
+        int Type = shapeObj["type"];
+        JsonArray dataArray = shapeObj["data"];
+
+        uint16_t shapeColor = myWHITE;
+        if (shapeObj.containsKey("color")) {
+            String hex = shapeObj["color"].as<String>(); // VD: "#FF0000"
+            int r = strtol(hex.substring(1,3).c_str(), nullptr, 16);
+            int g = strtol(hex.substring(3,5).c_str(), nullptr, 16);
+            int b = strtol(hex.substring(5,7).c_str(), nullptr, 16);
+            shapeColor = virtualDisp->color565(r, g, b);
+        }
+
+        uint16_t v1 = dataArray.size() > 0 ? dataArray[0].as<int>() : 0;
+        uint16_t v2 = dataArray.size() > 1 ? dataArray[1].as<int>() : 0;
+        uint16_t v3 = dataArray.size() > 2 ? dataArray[2].as<int>() : 0;
+        uint16_t v4 = dataArray.size() > 3 ? dataArray[3].as<int>() : 0;
+        uint16_t v5 = dataArray.size() > 4 ? dataArray[4].as<int>() : 0;
+        uint16_t v6 = dataArray.size() > 5 ? dataArray[5].as<int>() : 0;
+        switch(Type) {
+            case 0: DrawLine(v1, v2, v3, v4,shapeColor); break;
+            case 1: DrawRect(v1, v2, v3, v4,shapeColor); break;
+            case 2: DrawCircle(v1, v2, v3, shapeColor); break;
+            case 3: DrawTriangle(v1, v2, v3, v4, v5, v6, shapeColor); break;
+            default:
+                Serial.println("Loại hình không xác định: " + String(Type));
+                break;
+        }
+    }
+
+    Serial.println("Drawing complete.");
+}
+
+DynamicJsonDocument parseStringToJSON(String jsonStr) {
+    DynamicJsonDocument doc(1024);
+    DeserializationError err = deserializeJson(doc, jsonStr);
+    if (err) {
+        Serial.print("Lỗi parse JSON: ");
+        Serial.println(err.c_str());
+        return DynamicJsonDocument(0); // Trả về doc rỗng nếu lỗi
+    }
+    return doc;
+}
+
+void drawTextInShape(DynamicJsonDocument doc) {
+    if (!doc.is<JsonArray>() || doc.size() < 2) {
+        return;
+    }
+    get_CoordsAndID(doc[1].as<JsonArray>(), textCoorID);
+    for (int shapeIndex = 0; shapeIndex < MAX_GROUPS; shapeIndex++) {
+        for (int rowIndex = 0; rowIndex < rowsTextInEachShapeFilter[shapeIndex]; rowIndex++) {
+            int x = textCoorID[shapeIndex][rowIndex].x;
+            int y = textCoorID[shapeIndex][rowIndex].y;
+            virtualDisp->setCursor(x, y);
+            virtualDisp->setTextColor(myWHITE);
+            virtualDisp->setTextSize(1); // hoặc 2 nếu muốn chữ to hơn
+            virtualDisp->print(textContents[shapeIndex][rowIndex]);
+        }
+    }
+}
+
+void clearMSG(DynamicJsonDocument doc)
+{
+    // Nếu không còn shape và text, reset textContents và rowsTextInEachShapeFilter
+        for (int g = 0; g < MAX_GROUPS; g++) {
+            rowsTextInEachShapeFilter[g] = 0;
+            for (int l = 0; l < MAX_LINES_PER_GROUP; l++) {
+                textContents[g][l][0] = '\0';
+                textCoorID[g][l].x = 0;
+                textCoorID[g][l].y = 0;
+                textCoorID[g][l].id = 0;
+            }
+        }
+    }
+
+
+void draw_MSG(DynamicJsonDocument doc)
+{
+    virtualDisp->fillScreen(myBLACK);
+    drawShapeFromType(doc);
+    // Lấy tọa độ và id cho text
+    if (doc.size() > 1 && doc[1].is<JsonArray>()) {
+        get_CoordsAndID(doc[1].as<JsonArray>(), textCoorID);
+        mapDataToTextContents(doc[1].as<JsonArray>(), textContents); // map text từ doc[1]
+    }
+
+    showAllTextLines(textCoorID, textContents);
+
+    // Gửi JSON ra WebSocket
+    String jsonOut;
+    serializeJson(doc, jsonOut);
+    webSocketServer.textAll(jsonOut);
+}
+
+void showAllTextLines(TextLine textCoorID[MAX_GROUPS][MAX_LINES_PER_GROUP], char textContents[MAX_GROUPS][MAX_LINES_PER_GROUP][MAX_TEXT_LENGTH]) {
+  for (int shapeIndex = 0; shapeIndex < MAX_GROUPS; shapeIndex++) {
+    // Nếu nhóm này không có dòng nào thì bỏ qua
+    if (rowsTextInEachShapeFilter[shapeIndex] == 0) continue;
+
+    for (int rowIndex = 0; rowIndex < rowsTextInEachShapeFilter[shapeIndex]; rowIndex++) {
+      int x = textCoorID[shapeIndex][rowIndex].x;
+      int y = textCoorID[shapeIndex][rowIndex].y;
+
+      virtualDisp->setCursor(x, y);
+      virtualDisp->setTextColor(textCoorID[shapeIndex][rowIndex].color); // hoặc myWHITE
+      virtualDisp->setFont(&B_085pt7b ); //set font, cỡ chữ 
+      virtualDisp->setTextSize(1);
+      virtualDisp->print(textContents[shapeIndex][rowIndex]);
+    }
+  }
+
+  virtualDisp->flipDMABuffer(); // cập nhật nội dung vẽ
+}
+
+// textInfoArray là mảng JSON chứa thông tin về các dòng chữ trong từng shape
+void get_CoordsAndID(JsonArray textInfoArray, TextLine textCoorID[MAX_GROUPS][MAX_LINES_PER_GROUP]) {
+  for (int shapeIndex = 0; shapeIndex <  textInfoArray.size() && shapeIndex < MAX_GROUPS; shapeIndex++) {
+    JsonArray groupTextInEachShape =  textInfoArray[shapeIndex].as<JsonArray>();
+    int rowsTextInEachShape = groupTextInEachShape.size();
+    rowsTextInEachShapeFilter[shapeIndex] = rowsTextInEachShape > MAX_LINES_PER_GROUP ? MAX_LINES_PER_GROUP : rowsTextInEachShape;
+    for (int row = 0; row < rowsTextInEachShapeFilter[shapeIndex]; row++) {
+      JsonObject rowInfor = groupTextInEachShape[row];
+      JsonArray rowInfor_xy = rowInfor["xy"];
+      textCoorID[shapeIndex][row].x = rowInfor_xy[0].as<int>();
+      textCoorID[shapeIndex][row].y = rowInfor_xy[1].as<int>();
+      textCoorID[shapeIndex][row].id = rowInfor["id"].as<int>();
+      if (rowInfor.containsKey("color")) {
+        String hex = rowInfor["color"].as<String>(); // VD: "#FF0000"
+        int r = strtol(hex.substring(1,3).c_str(), nullptr, 16);
+        int g = strtol(hex.substring(3,5).c_str(), nullptr, 16);
+        int b = strtol(hex.substring(5,7).c_str(), nullptr, 16);
+        textCoorID[shapeIndex][row].color = virtualDisp->color565(r, g, b);
+    } else {
+        textCoorID[shapeIndex][row].color = myWHITE;
+    }
+    }
+  }
+}
+
+// void setup_web() {
+//         // Start HTTP server and webSocketServer
+//     server.on("/", []() {
+//       server.send_P(200, "text/html", MAINWEBPAGE);
+    
+//     });
+// }
+void setup_WS() {
+    // WiFi.begin(ssid, password);
+    // while (WiFi.status() != WL_CONNECTED) {
+    //     delay(500); Serial.print(".");
+    // }
+    // Serial.println("\nWiFi connected: " + WiFi.localIP().toString());
+
+
+    // // Khởi động ESPAsyncWebServer và WebSocket
+    // server.addHandler(&webSocketServer); // Đăng ký WebSocket handler trước khi bắt đầu server
+    // webSocketServer.onEvent(onWsEvent);
+    // server.begin();
+    // Serial.println("✅ HTTP server started!");
+    // Serial.println("✅ WebSocket server started!");
+}
+
+//tác dụng: lưu nội dung trong doc vào file config.json
+// nếu file đã tồn tại thì ghi đè, nếu không thì tạo mới
+void saveConfig(const DynamicJsonDocument& doc, String filePath ) {
+  File file = LittleFS.open(filePath, "w");
+  if (!file) {
+    // Serial.println("❌ Lỗi: Không thể mở file config để ghi.");
+    return;
+  }
+  if (serializeJson(doc, file) == 0) {
+    // Serial.println("❌ Lỗi: Ghi file config thất bại (JSON rỗng?).");
+  } else {
+    Serial.print("✅ Đã lưu config thành công vào /config.json: ");
+    String jsonOut;
+    serializeJson(doc, jsonOut);
+    // Serial.println(jsonOut);
+
+  }
+  file.close();
+}
+
+// Tác dụng: đọc nội dung từ file config.json rồi return biến struct Config
+DynamicJsonDocument loadLMDConfig(String filePath) {
+  DynamicJsonDocument doc(2048);
+  if (!LittleFS.exists(filePath)) {
+    Serial.println("⚠️ File config chưa tồn tại. Sẽ tạo mặc định...");
+    saveConfig(doc, filePath); // Lưu file mặc định
+    return doc;
+  }
+  File file = LittleFS.open(filePath, "r");
+  if (!file) {
+    Serial.println("❌ Lỗi mở file để đọc.");
+    return doc;
+  }
+  DeserializationError err = deserializeJson(doc, file);
+  file.close();
+if (err) {
+    // Serial.println("❌ Lỗi parse JSON. Tạo lại file mặc định.");
+    // doc.to<JsonArray>(); // Đảm bảo doc là mảng
+    // doc.add(JsonArray()); // shapes rỗng
+    // doc.add(JsonArray()); // texts rỗng
+    // saveConfig(doc, filePath);
+    Serial.println("Đã bị lỗi ");
+    String jsonOut;
+    serializeJson(doc, jsonOut);
+    Serial.print ("Lỗi: ");
+    // Serial.println(jsonOut);
+    return doc;
+}
+
+  Serial.println("✅ Đã đọc config từ " + filePath);
+    String jsonOut;
+    serializeJson(doc, jsonOut);
+    Serial.print ("Nội dung JSON load: ");
+    // Serial.println(jsonOut);
+    // webSocketServer.broadcastTXT(jsonOut);
+  return doc;
+}
+
+// ESPAsyncWebServer không hỗ trợ WebSocketsServer kiểu cũ, 
+// bạn cần dùng AsyncWebSocket thay thế.
+// Đầu tiên, khai báo đối tượng global (thay vì WebSocketsServer):
+// AsyncWebSocket ws("/ws");
+
+// Sau đó, thay đổi hàm event handler như sau:
+void LMDmain::StringProcess(String jsonStr) {
+    DynamicJsonDocument doc = parseStringToJSON(jsonStr);
+
+    if (!doc.isNull()) {
+        // Nếu là masterArray (shapes + texts)
+        if (doc.is<JsonArray>() && doc.size() == 2 && doc[0].is<JsonArray>() && doc[1].is<JsonArray>()) {
+            saveConfig(doc, "/CONFIG.json");
+            draw_MSG(doc); // chỉ gọi draw_MSG cho masterArray
+        }
+        // Nếu là text mapping (mảng các object có "data" và "info")
+        else if (doc.is<JsonArray>() && doc[0].is<JsonObject>() && doc[0].containsKey("data") && doc[0].containsKey("info")) {
+            Serial.println("Tôi dang map data");
+            mapDataToTextContents(doc.as<JsonArray>(), textContents);
+            showAllTextLines(textCoorID, textContents);   
+            saveConfig(doc, "/DATA.json");
+            Serial.println("✅ Đã lưu DATA.json");          
+        }
+        else {
+            Serial.println("❌ Không nhận diện được loại JSON!");
+        }
+    } else {
+        Serial.println("❌ Dữ liệu JSON không hợp lệ.");
+    }
+}
+void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
+    if (type == WS_EVT_CONNECT) {
+        Serial.printf("WebSocket client #%u connected\n", client->id());
+        // Gửi lại nội dung hiện tại của CONFIG.json
+        DynamicJsonDocument configDoc = loadLMDConfig("/CONFIG.json");
+        String jsonOut;
+        serializeJson(configDoc, jsonOut);
+        client->text(jsonOut);
+
+        configDoc = loadLMDConfig("/DATA.json");
+        serializeJson(configDoc, jsonOut);
+        client->text(jsonOut);
+        Serial.println("✅ Đã gửi lại nội dung CONFIG.json và DATA.json cho client.");
+    }
+    else if (type == WS_EVT_DISCONNECT) {
+        Serial.printf("WebSocket client #%u disconnected\n", client->id());
+    }
+    else if (type == WS_EVT_DATA) {
+        AwsFrameInfo *info = (AwsFrameInfo*)arg;
+        if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
+            String jsonStr = String((char*)data, len);
+            Serial.println("Nhận JSON từ web:");
+            Serial.println(jsonStr);
+            mainLMDS.StringProcess(jsonStr);
+        }
+    }
+}
+
+void setup_littleFS () {
+    delay(2000);
+    Serial.println("=== VirtualMatrixPanel Example 3: Single 1/4 Scan Panel ===");
+    if (!LittleFS.begin()) {
+        Serial.println("❌ Không thể mount LittleFS! Đang format lại...");
+        LittleFS.format(); // Thêm dòng này để format lại
+    if (!LittleFS.begin()) {
+        Serial.println("❌ Vẫn không mount được LittleFS sau khi format!");
+        return;
+    }
+    Serial.println("✅ Đã format và mount lại LittleFS thành công!");
+    }
+}
+
+void setup_ledPanel(){
+    HUB75_I2S_CFG mxconfig(
+    PANEL_RES_X * 2,
+    PANEL_RES_Y / 2,
+    1,
+    HUB75_I2S_CFG::i2s_pins{
+      R1_PIN, G1_PIN, B1_PIN, R2_PIN, G2_PIN, B2_PIN,
+      A_PIN, B_PIN, C_PIN, D_PIN, E_PIN,
+      LAT_PIN, OE_PIN, CLK_PIN
+    }
+  );
+  dma_display = new MatrixPanel_I2S_DMA(mxconfig);
+  dma_display->begin();
+  dma_display->setBrightness8(90);
+  dma_display->clearScreen();
+
+
+  virtualDisp = new VirtualMatrixPanel_T<CHAIN_NONE, MyScanTypeMapping>(1, 1, PANEL_RES_X, PANEL_RES_Y);
+  virtualDisp->setDisplay(*dma_display);
+
+  myBLACK = virtualDisp->color565(0, 0, 0);
+  myWHITE = virtualDisp->color565(255, 255, 255);
+
+  virtualDisp->fillScreen(myBLACK);
+}
+
+DynamicJsonDocument createSampleJson() {
+    DynamicJsonDocument doc(4096);
+    JsonArray arr = doc.to<JsonArray>();
+
+    for (int group = 0; group < MAX_GROUPS; group++) {
+        for (int row = 0; row < 4; row++) {
+            JsonObject obj = arr.createNestedObject();
+            obj["data"] = String(group) + "-" + String(row);
+            JsonArray info = obj.createNestedArray("info");
+            info.add(group); // shapeIndex
+            info.add(row);   // row
+        }
+    }
+    return doc;
+}
+
+void mapDataToTextContents(JsonArray arr, char textContents[MAX_GROUPS][MAX_LINES_PER_GROUP][MAX_TEXT_LENGTH]) {
+    //xóa hết trước khi map
+    // for (int g = 0; g < MAX_GROUPS; g++) {
+    //     for (int r = 0; r < MAX_LINES_PER_GROUP; r++) {
+    //         textContents[g][r][0] = '\0';
+    //     }
+    // }
+
+    for (JsonVariant v : arr) {
+        if (!v.is<JsonObject>()) continue;
+        String content = v["data"] | "";
+        if (!v["info"].is<JsonArray>()) continue;
+        JsonArray info = v["info"].as<JsonArray>();
+        if (info.size() < 2) continue;
+
+        int group = info[0].as<int>();
+        int row = info[1].as<int>();
+        if (group >= 0 && group < MAX_GROUPS && row >= 0 && row < MAX_LINES_PER_GROUP) {
+            strncpy(textContents[group][row], content.c_str(), MAX_TEXT_LENGTH - 1);
+            textContents[group][row][MAX_TEXT_LENGTH - 1] = '\0';
+        }
+    }
+    Serial.println("Nội dung textContents sau khi map:");
+    for (int g = 0; g < MAX_GROUPS; g++) {
+        for (int r = 0; r < MAX_LINES_PER_GROUP; r++) {
+            if (textContents[g][r][0] != '\0') {
+                Serial.printf("textContents[%d][%d]: %s\n", g, r, textContents[g][r]);
+            }
+        }
+    }
+} 
+
+const GFXfont* getFontByName(const String& name) {
+    if (name == "FreeSans9pt7b") return &FreeSans9pt7b;
+    else if (name == "Tiny3x3a2pt7b") return &Tiny3x3a2pt7b;
+    else if (name == "TomThumb") return &TomThumb; // nếu bạn thêm TomThumb.h
+    else if (name == "Picopixel") return &Picopixel; // nếu bạn thêm Picopixel.h
+    else return nullptr; // font không hỗ trợ
+}
+
+void handleSerialConfig() {
+    static String inputString = "";
+    static bool stringComplete = false;
+
+    // Đọc dữ liệu từ Serial
+    while (Serial.available()) {
+        char inChar = (char)Serial.read();
+        if (inChar == '\n') {
+            stringComplete = true;
+            break;
+        } else {
+            inputString += inChar;
+        }
+    }
+
+    // Nếu đã nhận đủ 1 dòng JSON
+    if (stringComplete) {
+        DynamicJsonDocument doc(256);
+        DeserializationError err = deserializeJson(doc, inputString);
+        if (err) {
+            Serial.print("Lỗi parse JSON: ");
+            Serial.println(err.c_str());
+        } else {
+            // Cấu hình WiFi
+            if (doc.containsKey("ssid") && doc.containsKey("password")) {
+                const char* ssid = doc["ssid"];
+                const char* password = doc["password"];
+                Serial.printf("Kết nối WiFi: %s ...\n", ssid);
+                WiFi.begin(ssid, password);
+                int t = 0;
+                while (WiFi.status() != WL_CONNECTED && t < 20) {
+                    delay(500);
+                    Serial.print(".");
+                    t++;
+                }
+                if (WiFi.status() == WL_CONNECTED) {
+                    Serial.println("\n✅ Đã kết nối WiFi!");
+                    Serial.print("IP: ");
+                    Serial.println(WiFi.localIP());
+                } else {
+                    Serial.println("\n❌ Kết nối WiFi thất bại!");
+                }
+            }
+            // Đổi font
+            if (doc.containsKey("font")) {
+                String fontName = doc["font"].as<String>();
+                const GFXfont* fontPtr = getFontByName(fontName);
+                if (fontPtr != nullptr) {
+                    virtualDisp->setFont(fontPtr);
+                    Serial.println("✅ Đã set font: " + fontName);
+                } else {
+                    Serial.println("❌ Font không hỗ trợ: " + fontName);
+                }
+                showAllTextLines(textCoorID, textContents); // Cập nhật hiển thị chữ với font mới
+            }
+        }
+        inputString = "";
+        stringComplete = false;
+    }
+}
+
+void LMD_setup() {
+
+    Serial.begin(115200);
+    setup_littleFS(); 
+    setup_WS();
+    // setup_web();
+    setup_ledPanel();
+    // listLittleFSFiles();
+
+    draw_MSG(loadLMDConfig("/CONFIG.json"));
+    DynamicJsonDocument dataDoc = loadLMDConfig("/DATA.json");
+    if (dataDoc.is<JsonArray>() && dataDoc.size() > 0) {
+        mapDataToTextContents(dataDoc.as<JsonArray>(), textContents);
+        showAllTextLines(textCoorID, textContents);
+        Serial.println("✅ Đã load DATA.json và hiển thị text!");
+    } else {
+        Serial.println("⚠️ DATA.json rỗng hoặc không đúng định dạng!");
+    }
+}
+    // Hiển thị chữ lên màn hình
+    // showAllTextLines(textCoorID, textContents);
+const float TEMP_OFFSET = -5.0;
+
+void LMD_loop() {
+    // handleSerialConfig(); // Xử lý cấu hình từ Serial nếu có
+  // Không làm gì trong loo
+// ESPAsyncWebServer handles clients asynchronously, no need for server.handleClient() or webSocketServer.loop()
+    // webSocketServer.cleanupClients(); // Dọn dẹp các client không còn kết nối
+    static bool printed = false;
+    if (!printed) {
+        Serial.println("💡 Chip Info:");
+        Serial.printf("📟 Chip Model: %s\n", ESP.getChipModel());
+        Serial.printf("🔄 Chip Revision: %d\n", ESP.getChipRevision());
+        Serial.printf("⚡ CPU Freq: %u MHz\n", ESP.getCpuFreqMHz());
+        Serial.printf("💾 Flash Chip Size: %u bytes\n", ESP.getFlashChipSize());
+        Serial.printf("📦 Heap Size: %u bytes\n", ESP.getHeapSize());
+        Serial.printf("🆓 Free Heap: %u bytes\n", ESP.getFreeHeap());
+        Serial.printf("📜 Sketch Size: %u bytes\n", ESP.getSketchSize());
+        Serial.printf("🗃️ Free Sketch Space: %u bytes\n", ESP.getFreeSketchSpace());
+        Serial.printf("🛠️ SDK Version: %s\n", ESP.getSdkVersion());
+        printed = true;
+    }
+    static unsigned long lastStatusMillis = 0;
+    if (millis() - lastStatusMillis >= 5000) {
+        lastStatusMillis = millis();
+        Serial.printf("🆓 Free Heap: %u bytes\n", ESP.getFreeHeap());
+        Serial.printf("🔻 Min Free Heap: %u bytes\n", ESP.getMinFreeHeap());
+        Serial.printf("📦 Heap Size: %u bytes\n", ESP.getHeapSize());
+        Serial.printf("🔝 Max Alloc Heap: %u bytes\n", ESP.getMaxAllocHeap());
+    #if defined(ESP32)
+        // Nhiệt độ chip ESP32 (nếu hỗ trợ)
+        Serial.printf("Chip Temperature: %.2f °C\n", temperatureRead() + TEMP_OFFSET);
+    #endif
+    }
+}
+
