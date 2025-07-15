@@ -1,10 +1,10 @@
 #ifndef Main_H
 #define Main_H
 
-#define USE_DoorLocker // Enable Door Locker functionality
+// #define USE_DoorLocker // Enable Door Locker functionality
 #define USE_OTA // Enable Over-The-Air updates
 
-#define USE_VEHICLE
+// #define USE_VEHICLE
 #define TCP_ETH
 #define USE_SD
 #define USE_LITTLEFS // Ensure LittleFS is used
@@ -19,7 +19,7 @@
 
 #ifdef TCP_ETH
 // #define USE_LAN8720
-#define USE_W5500
+// #define USE_W5500
 #endif// TCP_ETH
 
 #ifdef USE_SERIAL2
