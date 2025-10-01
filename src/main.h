@@ -9,13 +9,14 @@
 #define TCP_ETH
 #define USE_SD
 #define USE_LITTLEFS // Ensure LittleFS is used
+
 // #define USE_TCP
 // #define ESP32_RISCV
 
-#define USE_SERIAL2 // Ensure Serial2 is used
-// #define USE_SERIAL1 // Ensure Serial1 is used
+// #define USE_SERIAL2 // Ensure Serial2 is used
+#define USE_SERIAL1 // Ensure Serial1 is used
 #ifdef USE_SERIAL1
-#define USE_Modbus
+// #define USE_Modbus
 #define USE_MQTT
 #endif// USE_SERIAL1
 
@@ -26,7 +27,7 @@
 
 #ifdef USE_SERIAL2
 // #define USE_Modbus
-#define USE_MQTT
+// #define USE_MQTT
 #endif// USE_SERIAL2
 
 #define DEBUG_OUTPUT_SERIAL

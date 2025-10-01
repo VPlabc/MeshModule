@@ -6,9 +6,9 @@
 #include "WiFi.h"
 #include "Audio.h"
 #include "ARDUINO_JSON.h"
-#define I2S_BCLK      45
-#define I2S_LRC       47
-#define I2S_DOUT      46
+#define I2S_BCLK      38
+#define I2S_LRC       39
+#define I2S_DOUT      37
 Audio audio;
 AudioBuffer audioBuffer;
 

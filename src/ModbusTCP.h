@@ -1,112 +1,35 @@
-#ifdef USE_MODBUS_TCP
-#ifdef ESP8266
- #include <ESP8266WiFi.h>
-#else
- #include <WiFi.h>
-#endif
-#include <ModbusIP_ESP8266.h>
-#include <ArduinoJson.h>
+#ifndef MODBUS_TCP_
+#define MODBUS_TCP_
+#include "Arduino_JSON.h"
+#include "Modbus.h"
+// Khai báo extern để sử dụng các biến toàn cục
+extern boolean modbusTcp_coils[50];
+extern uint16_t modbusTcp_holdingRegisters[200];
+extern uint16_t modbusTcp_inputRegisters[200];
 
-uint16_t ModbusDataRead[130];//counterIn total 
-bool ModbusCoilRead[130];//counterIn total 
+#define modbusTcp_Slave 0
+#define modbusTcp_Master 1
 
-uint16_t AddrOffset = 0;
-
-uint16_t RegSpeedAddr = 160;
-
-uint16_t RegSpeed[2];
-
-int16_t Coil_Y40 = 32;               // Modbus Coil Offset
-
-const uint16_t CoilOffset = 0;               // Modbus Coil Offset
-
-static uint16_t nCountReadConnected = 0; 
-
-//Used Pins
-#ifdef ESP8266
-  #define 26 D4
- #else
-  #define UES_LED TX
- #endif
-
-ModbusIP ModBus;  //ModbusIP object
-class Modbus_TCP_Prog
+class ModbusTcp_Prog
 {
-public:
-uint16_t holdingRegisters[120];//0-30 PLC Data /30-34 total Plan / 34-74 product name 
-boolean coils[50];
+  public:
+    bool isConnect;
+    bool MB_connect = false;
 
+    uint16_t GetHoldingReg(uint16_t addr);
+    bool WriteHoldingReg(uint16_t addr, uint16_t value);
+    bool WriteNameToHoldregister(uint16_t addr, char *name);
+    bool WriteHoldingReg(uint16_t addr, uint16_t value, uint16_t len);
+    String getNameFromHoldregister(uint16_t addr);
+    void modbus_loop(int Timeout);
+    void modbus_setup(String ModbusParameter, uint8_t master_slave, String IP, uint16_t Port, uint8_t unitId);
+
+    void modbus_set_print_debug(bool value);
+
+  private:
+
+    //uint16_t cbRead(TRegister* reg, uint16_t val);
+    //uint16_t cbWrite(TRegister* reg, uint16_t val);
+    //uint16_t ModbusTcp_HoldregGet (TRegister* reg, uint16_t val0);
 };
-
-Modbus_TCP_Prog mb_c;
-
-uint16_t HoldRegCall(TRegister* r, uint16_t v) { // Callback function
-  if (r->value != v) {  // Check if Coil state is going to be changed
-    Serial.print("Read holdReg reg: ");
-    Serial.println(v);
-
-  }
-  return v;
-}
-
-uint16_t CoilCall(TRegister* r, uint16_t v) { // Callback function
-  if (r->value != v) {  // Check if Coil state is going to be changed
-    Serial.print("Read coil reg: ");
-    Serial.println(v);
-
-  }
-  return v;
-}
-
-void TCP_setup(bool role) {
-
-  if(role == 0){
-  ModBus.client();                    // Initialize local Modbus Client
-  ModBus.addCoil(Coil_Y40);           // Add Coil
-  // ModBus.onSetCoil(Coil_Y40, gc);     // Assign Callback on set the Coil
-  }
-  if(role == 1){
-    ModBus.server();
-    ModBus.onGetHreg(AddrOffset, HoldRegCall, 50);   
-    ModBus.onGetHreg(CoilOffset, CoilCall, 50);   
-  }
-}
-
-byte TCPconnected = 0; 
-byte TCPdisconnected = 0; 
-
-void TCP_loop(bool role,int IPAddr1,int IPAddr2,int IPAddr3,int IPAddr4) {
-  if(role == 0){
-    IPAddress remote(IPAddr1, IPAddr2, IPAddr3, IPAddr4);
-    // Serial.println(remote);
-    if (ModBus.isConnected(remote)) {   // Check if connection to Modbus Slave is established
-      if(TCPconnected++ > 3){Serial.println("TCP connected");TCPconnected = 3;TCPdisconnected = 0;}
-
-  //     ModBus.readCoil(remote, Coil_Y40, &RunStop); delay(1);
-  //       //-----Speed
-      ModBus.readHreg(remote, RegSpeedAddr, (uint16_t *)&RegSpeed, 2);delay(1); //Read holdingRegisters
-  // //ModBus.
-  //   ModBus.readHreg(remote, CounterTotal, (uint16_t *)&CounterData,4);delay(1);
-  //   ModBus.readHreg(remote, AddrOffset, (uint16_t *)&ModbusDataRead,50);delay(1);
-  //   ModBus.readCoil(remote, CoilOffset, (bool*)&ModbusCoilRead, 50); delay(1);
-  //
-  if (nCountReadConnected++ > 3)
-  {
-    nCountReadConnected = 0;
-      // CounterData[0] = 0;CounterData[1] = 0;CounterData[2] = 0;CounterData[3] = 0;
-      // SpeedData[0] = 0;SpeedData[1] = 0;
-      for(int i = 0; i < 130 ; i++){ModbusDataRead[i] = 0;}
-      for(int i = 0; i < 130 ; i++){ModbusCoilRead[i] = 0;}
-      ModBus.disconnect(remote); 
-    }
-    } else {
-      if(TCPdisconnected++ > 5){TCPdisconnected = 5;TCPconnected = 0;Serial.println("TCP disconnected, retry...");}
-      ModBus.connect(remote);           // Try to connect if no connection
-    }
-  }if(role == 1){ 
-
-  }
-  ModBus.task();                      // Common local Modbus task
-  delay(10);                     // Polling interval
-}
-#endif //USE_MODBUS_TCP
+#endif

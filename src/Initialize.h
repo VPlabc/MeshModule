@@ -21,7 +21,7 @@ bool initializeSDCard() {
     Serial.println("⚠️   SD_CS_PIN not set");
     Serial.println((" CS Pin: " + String(SD_CS_PIN)));
     return false; // SD_CS_PIN not set, cannot initialize SD card
-  } else if (SD_CS_PIN > 0 && SPI_Initialized == true){
+  } else if (SD_CS_PIN > 0 ){
     Serial.println((" CS Pin: " + String(SD_CS_PIN)));
     if (!SD.begin(SD_CS_PIN, SPI)) { // 4MHz SPI frequency
         Serial.println("\n❌ SD card failed to initialize! ❌");
