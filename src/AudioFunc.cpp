@@ -7,11 +7,12 @@
 #include "Audio.h"
 #include "ARDUINO_JSON.h"
 #define I2S_BCLK      38
-#define I2S_LRC       39
-#define I2S_DOUT      37
+#define I2S_LRC       33//39
+#define I2S_DOUT      34//37
 Audio audio;
 AudioBuffer audioBuffer;
 
+#ifdef LED
 #include <Adafruit_NeoPixel.h>
 
 Adafruit_NeoPixel AudStrip = Adafruit_NeoPixel(1, 21, NEO_GRB + NEO_KHZ800);
@@ -22,8 +23,9 @@ void AudLed_setColor(uint32_t color) {
     }
     AudStrip.show();
 }
-
+#endif//LED
 void AudioCmd::audio_setup() {
+    audioBuffer.init();
     if(audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT)){
         Serial.println("✅    Audio pins set successfully.");
     } else {
@@ -64,9 +66,9 @@ void AudioCmd::audioCmnd(const char *input)
             if (data.hasOwnProperty("light")) {
                 bool lightOn = (bool)data["light"];
                 if (lightOn) {
-                    digitalWrite(15, HIGH); // Turn on the LED
+                    // digitalWrite(15, HIGH); // Turn on the LED
                 } else {
-                    digitalWrite(15, LOW); // Turn on the LED
+                    // digitalWrite(15, LOW); // Turn on the LED
                 }
             }
             // Volume control
@@ -228,34 +230,45 @@ void AudioCmd::audio_loop()
                           audio.getAudioFileDuration(), 
                           audio.getAudioFileDuration());
             ledState = !ledState; // Toggle LED state
-            ledState ? AudLed_setColor(0x00ffff) : AudLed_setColor(0x000000);             
+            #ifdef LED
+            ledState ? AudLed_setColor(0x00ffff) : AudLed_setColor(0x000000);    
+            #endif//  LED       
         }
     } else if(!audio.isRunning())  {
         if(audio_playing) {
             audio_playing = false;
             Serial.println("Audio stopped playing.");
+                #ifdef LED
                 AudLed_setColor(0x000000); // Set LED color to blue
-
+                #endif// LED
         }
 
         if (!ledOn && currentMillis - lastBlinkTime >= 2000) {
+            #ifdef LED
             AudLed_setColor(0x00ff00);
+            #endif//LED
             ledOn = true;
             lastBlinkTime = currentMillis;
         }
         if (ledOn && currentMillis - lastBlinkTime >= 100) {
+            #ifdef LED
             AudLed_setColor(0x000000);
+            #endif//LED
             ledOn = false;
             lastBlinkTime = currentMillis;
         }
     } else if( WiFi.status() != WL_CONNECTED) {
         if (!ledOn && currentMillis - lastBlinkTime >= 1000) {
+            #ifdef LED
             AudLed_setColor(0xffff00);
+            #endif//LED
             ledOn = true;
             lastBlinkTime = currentMillis;
         }
         if (ledOn && currentMillis - lastBlinkTime >= 500) {
+            #ifdef LED
             AudLed_setColor(0x000000);
+            #endif //LED
             ledOn = false;
             lastBlinkTime = currentMillis;
         }

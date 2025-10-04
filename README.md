@@ -80,6 +80,7 @@ Debug
 - Mở tệp `platformio.ini` và cấu hình các thông số như WiFi, MQTT, LoRa, và Modbus.
 - Tải mã nguồn lên ESP32 bằng cách nhấn nút "Upload" trong PlatformIO.
 
+
 Tên: [Vĩnh Phát]
 Email: [PhatHoang]
 GitHub: [github.com/vplabc]

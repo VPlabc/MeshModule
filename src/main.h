@@ -6,6 +6,7 @@
 
 #define USE_VEHICLE
 #define USE_AUDIO // Enable Audio functionality
+// #define LEDRGB
 #define TCP_ETH
 #define USE_SD
 #define USE_LITTLEFS // Ensure LittleFS is used

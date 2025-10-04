@@ -2,13 +2,16 @@
 #include <ArduinoJson.h>
 #include <esp_spiram.h>
 #include <Arduino.h>
+
+#ifdef LEDRGB
 #include "LEDRGB.h"
+#endif//LEDRGB
 
 #ifndef USE_DoorLocker
 int timeZone = 7;
 
 //#define TCP_ETH
-#define RTU_RS485
+// #define RTU_RS485
 #define USE_OTA
 
 struct Config {
@@ -181,7 +184,7 @@ void waitSerialUSB(unsigned long timeoutMs = 10000) {
     }
 }
 
-void DataForPC(){
+void DataForPC() {
     if(MeshConfig.role == "Broker"){
         uint16_t Plan, Result;
         uint8_t state, RSSI, Com, WiFi, type, Cmd;
@@ -300,7 +303,7 @@ void loadConfig() {
         return;
     }
     // MeshConfig.boardModel = doc["boardModel"];
-    MeshConfig.boardModel = 6;//doc["boardModel"];
+    MeshConfig.boardModel = 7;//doc["boardModel"];
     const char* BrokerStr = doc["BrokerAddress"];
     if (BrokerStr) {
         int values[6];
@@ -666,9 +669,11 @@ void receiveCallback(const uint8_t *senderMac, const uint8_t *data, int dataLen)
     snprintf(macStr, sizeof(macStr), "%02x:%02x:%02x:%02x:%02x:%02x", senderMac[0], senderMac[1], senderMac[2], senderMac[3], senderMac[4], senderMac[5]);
     if(dataLen == sizeof(dataPacket)) {
         if(MeshConfig.dataVersion == 4){
+        #ifdef LEDRGB
             Led_setColor(0x0000ff);
             delay(100);
             Led_setColor(0x00000); // Toggle LED color
+        #endif//LEDRGB
         }else{
             digitalWrite(LED_STT, !digitalRead(LED_STT)); // Toggle LED state
             delay(100);
@@ -931,8 +936,10 @@ void checkConfigButton() {
 
                     Serial.println("⚠️    BUZZ pin not set");
                     if(MeshConfig.dataVersion == 4){
+                        #ifdef LEDRGB
                         Led_setColor(0x0000ff);delay(100);Led_setColor(0x00000);delay(100); // Toggle LED color
                         Led_setColor(0x0000ff);delay(100);Led_setColor(0x00000);delay(100); // Toggle LED color
+                        #endif//LEDRGB
                     }else{
                         digitalWrite(LED_STT, LOW);delay(100);digitalWrite(LED_STT, HIGH);delay(100);
                         digitalWrite(LED_STT, LOW);delay(100);digitalWrite(LED_STT, HIGH);delay(100);
@@ -952,9 +959,11 @@ void checkConfigButton() {
 
                     Serial.println("⚠️    BUZZ pin not set");
                     if(MeshConfig.dataVersion == 4){
+                        #ifdef LEDRGB
                         Led_setColor(0x0000ff);delay(100);Led_setColor(0x00000);delay(100); // Toggle LED color
                         Led_setColor(0x0000ff);delay(100);Led_setColor(0x00000);delay(100); // Toggle LED color
                         Led_setColor(0x0000ff);delay(100);Led_setColor(0x00000);delay(100); // Toggle LED color
+                        #endif//LEDRGB
                     }else{
                         digitalWrite(LED_STT, LOW);delay(100);digitalWrite(LED_STT, HIGH);delay(100);
                         digitalWrite(LED_STT, LOW);delay(100);digitalWrite(LED_STT, HIGH);delay(100);
@@ -1106,7 +1115,7 @@ void TskApp(void *pvParameter)
     for (;;)
     {
         if(MeshConfig.dataVersion == 4){
-            #ifdef USE__VEHICLE
+            #ifdef USE_VEHICLE
             VehicleLoop();
             #endif//USE__VEHICLE
         }   
@@ -1149,7 +1158,9 @@ void TskModbus(void *pvParameter)
                 timeCount = millis();
                 LedState = !LedState;
                 if(MeshConfig.dataVersion == 4){
+                    #ifdef LEDRGB
                     LedState?  Led_setColor(0x00ff00) : Led_setColor(0x000000); // Set LED to green or off
+                    #endif//LEDRGB
                 }else{
                     digitalWrite(LED_STT, LedState); // Toggle LED state
                 }
@@ -1295,6 +1306,8 @@ void setup()
         // loadDataMapping();
     }
 
+    MeshConfig.debug = 1;
+    // LED_STT = 21;
 
     #ifdef USE_Modbus
     if(MeshConfig.debug) Serial.println("Init Modbus");
@@ -1302,6 +1315,9 @@ void setup()
     #endif//USE_Modbus
 
     delay(1000);
+
+    initHardware();
+
     #ifdef USE_MQTT
     if(MeshConfig.debug) Serial.println("Init MQTT");
     MQTTwifiConfig.setup();// read MQTT & WiFi config
@@ -1377,6 +1393,7 @@ void setup()
     #ifdef USE_TCP
     LoadTCPConfig();
     #endif//USE_TCP
+
     if (MeshConfig.debug) Serial.println("Init Hardware Driver");
     if(SETUP_BUTTON < 0){
         Serial.println("⚠️    SETUP_BUTTON pin not set");
@@ -1389,6 +1406,7 @@ void setup()
         #ifdef USE_VEHICLE
         VehicleSetup();
         #endif//USE_VEHICLE
+        #ifdef LEDRGB
         Led_setup();
         if(MeshConfig.debug)Serial.println("  Using external RGB LED");
         Led_setColor(0x000000); // Set LED to off
@@ -1403,6 +1421,7 @@ void setup()
         delay(100);
         Led_setColor(0x00ff00); // Set LED to green
         delay(100);
+        #endif//LEDRGB
     }else{
         if(MeshConfig.debug)Serial.println("  Using external LED");
         // use the built in LED
@@ -1416,9 +1435,11 @@ void setup()
     #ifdef USE_Modbus
         // xTaskCreatePinnedToCore(TskModbus, "TaskModbus", 16384, NULL, 2, &TaskModbus, 1);
     #endif//USE_Modbus
+    // while (1);
 
-    if (MeshConfig.debug) Serial.println("Creating Task Application ");
-    xTaskCreatePinnedToCore(TskApp, "TskApp", 8000, NULL, 1, &TaskApp, 0);
+
+    // if (MeshConfig.debug) Serial.println("Creating Task Application ");
+    // xTaskCreatePinnedToCore(TskApp, "TskApp", 8000, NULL, 1, &TaskApp, 0);
 
     if (MeshConfig.debug) Serial.println("🌎   Creating Task Ethernet");
     xTaskCreatePinnedToCore(TskEthernet, "TskEthernet", 8000, NULL, 1, &TaskEthernet, 1);
@@ -1426,7 +1447,6 @@ void setup()
     if (MeshConfig.debug) Serial.println("\n🌎 time zone: " + String(timeZone));
     rtcTimeOnl.Time_setup(timeZone);
 
-    initHardware();
         
     // #endif
     // LittleFS.remove("/index.html");
@@ -1436,7 +1456,7 @@ void setup()
     if (MeshConfig.debug) Serial.println("PSRAM available: " + String(psramFound() ? "Yes" : "No"));
     if (psramInit()) {
         if (MeshConfig.debug) Serial.println("✅  PSRAM initialized successfully.");
-        acc_data_all = (unsigned char *) ps_malloc (n_elements * sizeof (unsigned char)); 
+        // acc_data_all = (unsigned char *) ps_malloc (n_elements * sizeof (unsigned char)); 
     } else {
         if (MeshConfig.debug) Serial.println("❌  PSRAM initialization failed or not available.");
     }
@@ -1468,8 +1488,8 @@ void loop()
         ModbusCurrentMillis = millis();
         
         if (psramFound()){
-            Serial.println(acc_data_all[1]);
-            acc_data_all[1] = 'a';
+            // Serial.println(acc_data_all[1]);
+            // acc_data_all[1] = 'a';
         }  
         // printNodeDataWithMapping(); // In dữ liệu node
         printNodeData() ;

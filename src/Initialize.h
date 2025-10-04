@@ -152,16 +152,16 @@ void initHardware() {
         digitalWrite(Y9, LOW);
     }
 
-    if(LED_STT == -1){
-        Serial.println("⚠️   LED_STT pin not set");
-        LED_STT = 0; // Set to 0 to disable LED functionality
-    }else if(LED_STT > 0){
-        pinMode(LED_STT, OUTPUT);
-        digitalWrite(LED_STT, HIGH);delay(100);
-        digitalWrite(LED_STT, LOW);delay(100);
-        digitalWrite(LED_STT, HIGH);delay(100);
-        digitalWrite(LED_STT, LOW);delay(100);
-    }
+    // if(LED_STT == -1){
+    //     Serial.println("⚠️   LED_STT pin not set");
+    //     LED_STT = 0; // Set to 0 to disable LED functionality
+    // }else if(LED_STT > 0){
+    //     pinMode(LED_STT, OUTPUT);
+    //     digitalWrite(LED_STT, HIGH);delay(100);
+    //     digitalWrite(LED_STT, LOW);delay(100);
+    //     digitalWrite(LED_STT, HIGH);delay(100);
+    //     digitalWrite(LED_STT, LOW);delay(100);
+    // }
 
     if(I2C_SDA == -1 || I2C_SCL == -1){
         Serial.println("⚠️   I2C pins not set");

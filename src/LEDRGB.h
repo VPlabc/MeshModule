@@ -1,4 +1,6 @@
 #include <Arduino.h>
+#ifdef LEDRGB
+
 #include <Adafruit_NeoPixel.h>
 
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(1, 21, NEO_GRB + NEO_KHZ800);
@@ -35,3 +37,4 @@ void Led_off() {
     strip.show();
 }
 
+#endif//
