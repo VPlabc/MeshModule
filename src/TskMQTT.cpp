@@ -1,6 +1,10 @@
 #include "TskMQTT.h"
 #include "WebInterface.h"
 WebinterFace webInterface;
+
+
+#include "./AudioFunc.h"
+AudioCmd mainAudioCmd;
 // #define ESP32SC
 // #ifdef ESP32SC
 // #include <WebServer_ESP32_SC_W5500.h>
@@ -361,8 +365,6 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
 
   
   void WifiMqttConfig::setup() {
-    pinMode(15, OUTPUT); // Set GPIO 15 as output for LED control
-    digitalWrite(15, LOW); // Initialize LED to LOW (off)
 
     if (LittleFS.exists(WIFIMQTT_FILE)) {
         File configFile = LittleFS.open(WIFIMQTT_FILE, "r");
@@ -494,10 +496,14 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
         static unsigned long lastAttemptTime = 0;
         if (millis() - lastAttemptTime > 5000) { // Delay 2000ms between connection attempts
             lastAttemptTime = millis();
+            int LightState = mainAudioCmd.getLedState();
+
             Serial.println(" 📋 eth_connected: " + String(eth_connected ? "✔️" : "❌"));
             Serial.println(" 📋 WiFi.isConnected(): " + String(WiFi.isConnected() ? "✔️" : "❌"));
             Serial.println(" 📋 mqttIsConnected: " + String(mqttIsConnected ? "✔️" : "❌"));
             Serial.println(" 📋 mqttEnable: " + String(mqttEnable ? "✔️" : "❌"));
+            Serial.println(" 📋 LightState: " + String(LightState ? "✔️" : "❌"));
+            Serial.println(" 📋 LightState: " + String(mainAudioCmd.getLedState()));
             if (eth_connected && !mqttIsConnected && mqttEnable) {
                 // xTimerStop(wifiReconnectTimer, 0);
                 Serial.println(" ✅   ethernet connected, attempting to connect to MQTT...");

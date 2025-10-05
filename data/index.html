@@ -1428,8 +1428,6 @@
             if((event.data[0] == '[' || event.data[0] == '{') && event.data != "undefined"){
                 const data = JSON.parse(event.data);
                 // console.log('Received data:', data);
-                loadNodeDashboard(event.data);
-                document.getElementById('jsonMappingData').value = event.data;
                 if (typeof data === 'object' ){
                     if ( data.ResetRom === 'ok') {
                         document.getElementById('resetEspResponse').textContent = "ROM reset successful!";
@@ -1437,9 +1435,9 @@
                         document.getElementById('resetEspResponse').textContent = data.status;
                     } else if (data.error) {
                         document.getElementById('resetEspResponse').textContent = 'Error: ' + data.error;
-                    } else if (data.lightStatus){
-                        console.log('LED status received:', data.lightStatus);
-                        updateLedStatus(data.lightStatus);
+                    } else {
+                        loadNodeDashboard(event.data);
+                        document.getElementById('jsonMappingData').value = event.data;
                     }
                 }
             }
@@ -2110,14 +2108,9 @@
                 console.error("Invalid JSON data:", error);
                 return;
             }
-            try {
-                nodes = JSON.parse(JsonData);
-            } catch (error) {
-                console.error("Invalid JSON data:", error);
-                return;
-            }
             // Handle Modbus value set confirmation
             if (typeof nodes === 'object' ){
+                
                 if ( nodes.setModbusValue === 'ok') {
                     // alert('Set Modbus value: OK');
                     return;
@@ -2127,7 +2120,7 @@
                 } else if ( nodes.setModbusValue === 'fail' &&  nodes.error) {
                     // alert('Set Modbus value: Fail | ' + nodes.error);
                     return;
-                }
+                } 
                 
             }
             try {
@@ -2209,6 +2202,9 @@
             const buzzState = status.buzzEnb !== undefined ? status.buzzEnb : (nodes.buzzEnb ?? '-');
             const debugState = status.debug !== undefined ? status.debug : (nodes.debug ?? '-');
             const socketState = socketstate ? "Connected" : "Disconnected";
+            const LightStatus = typeof nodes.lightStatus !== 'undefined' ? nodes.lightStatus : "Unknown";
+            console.log('LED status received:', LightStatus);
+            updateLedStatus(LightStatus);
             // Helper for gauge
             function gaugeHtml(label, value, min, max, unit, color) {
                 const percent = (typeof value === 'number' && max > min) ? Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100)) : 0;

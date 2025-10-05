@@ -48,7 +48,7 @@ int8_t Board4[] = {/*BUZZ*/ -1, /*SETUP_BUTTON*/  0, /*LED_STT*/ 13, /*I2C_SDA*/
 /*board S3SDCWER [ID 6]*/
 int8_t Board5[] = {/*BUZZ*/ -1, /*SETUP_BUTTON*/  0, /*LED_STT*/ 13, /*I2C_SDA*/ 41, /*I2C_SCL*/ 42, /*Y8*/ -1, /*Y9*/ -1, /*DA0*/ -1, /*DA1*/ -1, /*InPut0*/ -1, /*InPut1*/ -1, /*InPut2*/ -1, /*InPut3*/ -1, /*InPut4*/ -1, /*Ser_1RX*/ 18, /*Ser_1TX*/ 17, /*M0_PIN*/ 16, /*M1_PIN*/ -1, /*CS*/ 20, /*RST*/  8, /*INIT*/ 19, /*Ser_2RX*/ -1, /*Ser_2TX*/ -1, /*MOSI_PIN*/ 35, /*MISO_PIN*/ 37, /*SCK_PIN*/ 36, /*SD_CS_PIN*/ 38, /*SD_MOSI_PIN*/ -1, /*SD_MISO_PIN*/ -1, /*SD_SCK_PIN*/ -1};
 /*board S3SDCWE [ID 7]*/
-int8_t Board6[] = {/*BUZZ*/ -1, /*SETUP_BUTTON*/  0, /*LED_STT*/ 21, /*I2C_SDA*/ 41, /*I2C_SCL*/ 42, /*Y8*/ -1, /*Y9*/ -1, /*DA0*/ -1, /*DA1*/ -1, /*InPut0*/ -1, /*InPut1*/ -1, /*InPut2*/ -1, /*InPut3*/ -1, /*InPut4*/ -1, /*Ser_1RX*/ 18, /*Ser_1TX*/ 17, /*M0_PIN*/ 16, /*M1_PIN*/ -1, /*CS*/ 14, /*RST*/  9, /*INIT*/ 10, /*Ser_2RX*/ -1, /*Ser_2TX*/ -1, /*MOSI_PIN*/ 11, /*MISO_PIN*/ 12, /*SCK_PIN*/ 13, /*SD_CS_PIN*/  4, /*SD_MOSI_PIN*/  6, /*SD_MISO_PIN*/  5, /*SD_SCK_PIN*/  7};
+int8_t Board6[] = {/*BUZZ*/ -1, /*SETUP_BUTTON*/  0, /*LED_STT*/ -1, /*I2C_SDA*/ 41, /*I2C_SCL*/ 42, /*Y8*/  2, /*Y9*/ -1, /*DA0*/ -1, /*DA1*/ -1, /*InPut0*/ -1, /*InPut1*/ -1, /*InPut2*/ -1, /*InPut3*/ -1, /*InPut4*/ -1, /*Ser_1RX*/ 18, /*Ser_1TX*/ 17, /*M0_PIN*/ 16, /*M1_PIN*/ -1, /*CS*/ 14, /*RST*/  9, /*INIT*/ 10, /*Ser_2RX*/ -1, /*Ser_2TX*/ -1, /*MOSI_PIN*/ 11, /*MISO_PIN*/ 12, /*SCK_PIN*/ 13, /*SD_CS_PIN*/  4, /*SD_MOSI_PIN*/  6, /*SD_MISO_PIN*/  5, /*SD_SCK_PIN*/  7};
 /*board Custom*/
 int8_t BoardCustom[] = {/*BUZZ*/ -1, /*SETUP_BUTTON*/  0, /*LED_STT*/ 14, /*I2C_SDA*/ 41, /*I2C_SCL*/ 42, /*Y8*/ -1, /*Y9*/ -1, /*DA0*/ -1, /*DA1*/ -1, /*InPut0*/ -1, /*InPut1*/ -1, /*InPut2*/ -1, /*InPut3*/ -1, /*InPut4*/ -1, /*Ser_1RX*/ 18, /*Ser_1TX*/ 17, /*M0_PIN*/ 16, /*M1_PIN*/ -1, /*CS*/ 20, /*RST*/  8, /*INIT*/ 19, /*Ser_2RX*/ -1, /*Ser_2TX*/ -1, /*MOSI_PIN*/ 35, /*MISO_PIN*/ 37, /*SCK_PIN*/ 36, /*SD_CS_PIN*/ 21, /*SD_MOSI_PIN*/ -1, /*SD_MISO_PIN*/ -1, /*SD_SCK_PIN*/ -1};
 
@@ -270,7 +270,7 @@ void set_Pinout(uint8_t BoardModel){
     LED_STT = 21; 
     I2C_SDA = 41; 
     I2C_SCL = 42; 
-    Y8 = -1; 
+    Y8 = 2; 
     Y9 = -1; 
     DA0 = -1; 
     DA1 = -1; 

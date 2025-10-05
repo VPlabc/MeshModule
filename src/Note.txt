@@ -153,7 +153,8 @@ list các thông số
   "power": 30
 }
 
-
+topic Pubshing:
+  vms/coca/notify/material
 
 {"cmd":"speech","text":"có xe đang vào slot Loading bảng số 60F190.00", "voice":"vi"}
 {"cmd":"speech","text":"có xe đang vào slot. bảng số 60F190.00", "voice":"vi"}
@@ -173,11 +174,32 @@ topics:
 
 
 {
-   "executeAt":"2025-06-04T09:00:00Z",
-   "data":{
-      "light":true,
-      "volume":1-7,
-     "speech": "ALO ALO 1 2 3 4",
-     "voice":"vi"
-   }
+  "executeAt":"2025-06-04T09:00:00Z",
+  "data":{
+    "light":true,
+    "volume":4,
+    "playurl": "http://stream2.dancewave.online:8080/dance.ogg"  
+  }
 }
+
+{
+  "executeAt":"2025-06-04T09:00:00Z",
+  "data":{
+    "light":true,
+    "volume":4,
+    "play"":"/sound1.mp3"
+  }
+}
+
+{
+  "executeAt":"2025-06-04T09:00:00Z",
+  "data":{
+    "light":true,
+    "volume":4,
+    "speech": "ALO ALO 1 2 3 4",
+    "voice":"vi"
+  }
+}
+
+
+{"freeRam":106,"freeSram":6832,"chipTemp":65.74900055,"mqttState":"connected","wifiMode":"AP","meshEnable":false,"loraEnable":false,"runTime":102,"resetCounter":376,"lightStatus":"on"}

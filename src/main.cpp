@@ -7,6 +7,7 @@
 #include "LEDRGB.h"
 #endif//LEDRGB
 
+#include "PinMapping.h"
 #ifndef USE_DoorLocker
 int timeZone = 7;
 
@@ -107,7 +108,6 @@ LoRaFunction mainLoRa; // Ensure this is declared only if USE_Modbus is defined
 
 #include "monitor.h"
 
-#include "PinMapping.h"
 // #include "DataMapping.h"
 #include "StoreData.h"
 
@@ -840,7 +840,6 @@ void Broker(const String &message)
 {
     esp_now_peer_info_t peerInfo = {};
     static const uint8_t defaultBrokerAddress[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-
     memcpy(&peerInfo.peer_addr, defaultBrokerAddress, 6);
     if (!esp_now_is_peer_exist(defaultBrokerAddress))
     {
@@ -884,7 +883,6 @@ unsigned long buttonPressTime = 0;
 void startConfigPortal() {
 
     if (MeshConfig.debug) Serial.println("Starting configuration portal...");
- 
     // Dừng ESP-NOW nếu đang chạy
     if (esp_now_deinit() == ESP_OK) {
         if (MeshConfig.debug) Serial.println("✅  Mesh deInit Success");
@@ -1251,7 +1249,7 @@ void TaskWifiMQTT(void *pvParameter)
                 doc["loraEnable"] = MeshConfig.LoRaEnable;
                 doc["runTime"] = millis() / 1000;
                 doc["resetCounter"] = resetcounter;
-                doc["lightStatus"] = LedState ? "on" : "off";
+                doc["lightStatus"] = audio_cmd.getLedState() ? "on" : "off";
                 String boardInfo;
                 serializeJson(doc, boardInfo);
                 mainwebInterface.SendMessageToClient(boardInfo);
@@ -1438,8 +1436,8 @@ void setup()
     // while (1);
 
 
-    // if (MeshConfig.debug) Serial.println("Creating Task Application ");
-    // xTaskCreatePinnedToCore(TskApp, "TskApp", 8000, NULL, 1, &TaskApp, 0);
+    if (MeshConfig.debug) Serial.println("Creating Task Application ");
+    xTaskCreatePinnedToCore(TskApp, "TskApp", 8000, NULL, 1, &TaskApp, 0);
 
     if (MeshConfig.debug) Serial.println("🌎   Creating Task Ethernet");
     xTaskCreatePinnedToCore(TskEthernet, "TskEthernet", 8000, NULL, 1, &TaskEthernet, 1);
@@ -1470,12 +1468,12 @@ void setup()
     xTaskCreatePinnedToCore(TaskWifiMQTT, "TaskWifiMQTT", 16384, NULL, 1, &TaskMQTT, 0);
     #endif //USE_MQTT
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // if(MeshConfig.debug) Serial.println("Init SPI");
-    // initializeSPI();
-    // if(MeshConfig.debug) Serial.println("Init SDcard");
-    // if (!initializeSDCard()) {
-    //     Serial.println("❌  Failed to initialize SD card.");
-    // } 
+    if(MeshConfig.debug) Serial.println("Init SPI");
+    initializeSPI();
+    if(MeshConfig.debug) Serial.println("Init SDcard");
+    if (!initializeSDCard()) {
+        Serial.println("❌  Failed to initialize SD card.");
+    } 
 
 }
 long timeCount = 0;

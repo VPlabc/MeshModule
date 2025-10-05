@@ -81,6 +81,43 @@ Debug
 - Tải mã nguồn lên ESP32 bằng cách nhấn nút "Upload" trong PlatformIO.
 
 
+{
+  "cmd": "playurl",
+  "url": "http://stream2.dancewave.online:8080/dance.ogg"
+}
+
+{
+  "volume":4,
+  "cmd": "playurl",
+  "url": "http://stream2.dancewave.online:8080/dance.ogg"  
+}
+
+{
+  "executeAt":"2025-06-04T09:00:00Z",
+  "data":{
+    "light":true,
+    "volume":4,
+    "speech": "ALO ALO 1 2 3 4",
+    "voice":"vi"
+  }
+}
+
+{
+  "cmd":"play",
+  "file":"/sound1.mp3"
+}
+
+Serial.println("  {\"cmd\":\"resume\"} : Resume audio playback.");
+Serial.println("  {\"cmd\":\"pause\"} : Pause audio playback.");
+Serial.println("  {\"cmd\":\"stop\"} : Stop audio playback.");
+Serial.println("  {\"cmd\":\"seek\":<position>} : Seek to a specific position in seconds.");
+Serial.println("  {\"cmd\":\"balance\",\"value\":<value>} : Set audio balance (-100 to 100).");
+Serial.println("  {\"cmd\":\"tone\",\"low\":<value>, \"mid\":<value>, \"high\":<value>}} : Set audio tone.");
+Serial.println("  {\"cmd\":\"status\"} : Get current audio status.");
+Serial.println("  {\"cmd\":\"clear\"} : Clear audio buffer and reset settings.");
+Serial.println("  {\"cmd\":\"help\"} : Show this help message.");
+Serial.println("  {\"cmd\":\"exit\"} : Exit audio control.");
+
 Tên: [Vĩnh Phát]
 Email: [PhatHoang]
 GitHub: [github.com/vplabc]
