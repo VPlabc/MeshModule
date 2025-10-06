@@ -502,8 +502,9 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
             Serial.println(" 📋 WiFi.isConnected(): " + String(WiFi.isConnected() ? "✔️" : "❌"));
             Serial.println(" 📋 mqttIsConnected: " + String(mqttIsConnected ? "✔️" : "❌"));
             Serial.println(" 📋 mqttEnable: " + String(mqttEnable ? "✔️" : "❌"));
-            Serial.println(" 📋 LightState: " + String(LightState ? "✔️" : "❌"));
-            Serial.println(" 📋 LightState: " + String(mainAudioCmd.getLedState()));
+            Serial.println("================================");
+            Serial.println(" 💡 LightState: " + String(LightState ? "🟢" : "⚫"));
+            Serial.println("================================");
             if (eth_connected && !mqttIsConnected && mqttEnable) {
                 // xTimerStop(wifiReconnectTimer, 0);
                 Serial.println(" ✅   ethernet connected, attempting to connect to MQTT...");

@@ -167,7 +167,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
     //     ledState = !ledState;
     //     notifyClients();
     //   }
-        Serial.println("Data Recive:" + String((char*)data));
+        // Serial.println("Data Recive:" + String((char*)data));
         DynamicJsonDocument doc(256);
         DeserializationError error = deserializeJson(doc, (char*)data);
         if (!error && doc.containsKey("login")) {

@@ -99,9 +99,12 @@ void AudioCmd::audioCmnd(const char *input)
             // Volume control
             if (data.hasOwnProperty("volume")) {
                 int vol = (int)data["volume"];
-                if (vol >= 0 && vol <= 7) {
+                if (vol >= 0 && vol <= 21) {
                     audio.setVolume(vol);
                     Serial.printf("Set volume to %d\n", vol);
+                }
+                if ( vol > 0 ) {
+                    audio.connecttoFS(SD, "/sound2.wav");
                 }
             } 
             if(data.hasOwnProperty("speech")) {
